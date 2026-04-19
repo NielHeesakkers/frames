@@ -124,6 +124,7 @@ func NewRouter(d Deps) http.Handler {
 		Queue:    d.Queue,
 		MaxBytes: d.ShareUploadMax,
 		Log:      d.Log,
+		Secure:   d.Secure,
 	}
 	r.Route("/api/s", func(r chi.Router) {
 		r.Post("/{token}/unlock", psh.handleUnlock)

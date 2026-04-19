@@ -34,6 +34,7 @@ type publicShareDeps struct {
 	Queue    *thumbnail.Queue
 	MaxBytes int64
 	Log      *slog.Logger
+	Secure   bool
 }
 
 // thumbnailCache is a minimal interface matching *thumbnail.Cache.
@@ -99,7 +100,7 @@ func (psh *publicShareDeps) handleUnlock(w http.ResponseWriter, r *http.Request)
 	// (Acceptable here because the attacker who can read it can already use the share URL.)
 	http.SetCookie(w, &http.Cookie{
 		Name: shareCookieName(tok), Value: req.Password,
-		Path: "/s/" + tok, HttpOnly: true, SameSite: http.SameSiteLaxMode,
+		Path: "/s/" + tok, HttpOnly: true, Secure: psh.Secure, SameSite: http.SameSiteLaxMode,
 	})
 	w.WriteHeader(http.StatusNoContent)
 }
