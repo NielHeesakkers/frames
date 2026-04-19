@@ -173,7 +173,14 @@
       {/if}
 
       {#if !atRoot}
-        <Grid files={files} on:context={onContext} />
+        <section class="files-section">
+          <h3>Foto's{files.length > 0 ? ` (${files.length})` : ''}</h3>
+          {#if files.length === 0}
+            <div class="empty">Geen foto's in deze map. Kies een submap of upload nieuwe bestanden.</div>
+          {:else}
+            <Grid files={files} on:context={onContext} />
+          {/if}
+        </section>
       {/if}
     </div>
   {/if}
@@ -241,4 +248,6 @@
   .latest-cell { display: block; aspect-ratio: 1; overflow: hidden; border-radius: 4px;
     background: var(--bg-2); border: 1px solid var(--border); }
   .latest-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .files-section { display: flex; flex-direction: column; min-height: 0; }
+  .empty { padding: 16px; color: var(--fg-dim); font-style: italic; }
 </style>
