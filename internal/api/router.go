@@ -58,6 +58,7 @@ func NewRouter(d Deps) http.Handler {
 			bd := &browseDeps{DB: d.DB}
 			r.Get("/folder", bd.handleFolder)
 			r.Get("/folder/*", bd.handleFolder)
+			r.Get("/tree", bd.handleTree)
 		})
 	})
 

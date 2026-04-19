@@ -99,3 +99,45 @@ func (bd *browseDeps) handleFolder(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 }
+
+type treeNodeDTO struct {
+	ID       int64  `json:"id"`
+	Path     string `json:"path"`
+	Name     string `json:"name"`
+	HasChild bool   `json:"has_child"`
+	Items    int64  `json:"items"`
+}
+
+func (bd *browseDeps) handleTree(w http.ResponseWriter, r *http.Request) {
+	parentPath := r.URL.Query().Get("parent")
+	var parentID int64
+	if parentPath == "" {
+		root, err := bd.DB.FolderByPath("")
+		if err != nil {
+			WriteJSON(w, http.StatusOK, map[string]any{"data": []treeNodeDTO{}})
+			return
+		}
+		parentID = root.ID
+	} else {
+		f, err := bd.DB.FolderByPath(parentPath)
+		if err != nil {
+			WriteError(w, http.StatusNotFound, "parent not found")
+			return
+		}
+		parentID = f.ID
+	}
+	kids, err := bd.DB.ChildFolders(parentID)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	out := make([]treeNodeDTO, 0, len(kids))
+	for _, c := range kids {
+		sub, _ := bd.DB.ChildFolders(c.ID)
+		out = append(out, treeNodeDTO{
+			ID: c.ID, Path: c.Path, Name: c.Name,
+			HasChild: len(sub) > 0, Items: c.ItemCount,
+		})
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": out})
+}
