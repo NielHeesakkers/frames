@@ -23,6 +23,9 @@
   let showNewFolder = false;
   let sharing: any = null;
 
+  let dragging = false;
+  let droppedFiles: File[] = [];
+
   async function load() {
     loading = true;
     const sort = $sortMode === 'takenAt' ? 'taken' : $sortMode;
@@ -50,6 +53,27 @@
     load();
   }
 
+  function onDragOver(e: DragEvent) {
+    e.preventDefault();
+    dragging = true;
+  }
+  function onDragLeave(e: DragEvent) {
+    // Ignore leaves that land on child nodes inside the container.
+    const t = e.currentTarget as HTMLElement | null;
+    const rel = e.relatedTarget as Node | null;
+    if (t && rel && t.contains(rel)) return;
+    dragging = false;
+  }
+  function onDrop(e: DragEvent) {
+    e.preventDefault();
+    dragging = false;
+    const fl = e.dataTransfer?.files;
+    if (fl && fl.length > 0) {
+      droppedFiles = Array.from(fl);
+      uploading = true;
+    }
+  }
+
   function contextItems(f: any) {
     return [
       { label: 'Open', onSelect: () => location.assign(`/file/${f.id}`) },
@@ -62,41 +86,46 @@
   }
 </script>
 
-<div class="toolbar">
-  <select bind:value={$sortMode}>
-    <option value="takenAt">By capture date</option>
-    <option value="name">By name</option>
-    <option value="size">By size</option>
-  </select>
-  <select bind:value={$density}>
-    <option value="small">S</option><option value="medium">M</option><option value="large">L</option>
-  </select>
-  <div class="spacer" />
-  <button on:click={() => (showNewFolder = true)}>New folder</button>
-  <button on:click={() => (sharing = { id: folder.id, path: folder.path })}>Share</button>
-  <button class="primary" on:click={() => (uploading = true)}>+ Upload</button>
-</div>
+<div class="browse-root" class:dragging
+     on:dragover={onDragOver}
+     on:dragleave={onDragLeave}
+     on:drop={onDrop}>
+  <div class="toolbar">
+    <select bind:value={$sortMode}>
+      <option value="takenAt">By capture date</option>
+      <option value="name">By name</option>
+      <option value="size">By size</option>
+    </select>
+    <select bind:value={$density}>
+      <option value="small">S</option><option value="medium">M</option><option value="large">L</option>
+    </select>
+    <div class="spacer" />
+    <button on:click={() => (showNewFolder = true)}>New folder</button>
+    <button on:click={() => (sharing = { id: folder.id, path: folder.path })}>Share</button>
+    <button class="primary" on:click={() => (uploading = true)}>+ Upload</button>
+  </div>
 
-{#if loading}
-  <div class="loading">Loading…</div>
-{:else}
-  {#if folders.length > 0}
-    <section>
-      <h3>Subfolders</h3>
-      <div class="folder-cards">
-        {#each folders as sub}
-          <a class="fcard" href={`/browse/${sub.path.split('/').map(encodeURIComponent).join('/')}`}
-             on:click|preventDefault={() => currentFolderPath.set(sub.path)}>
-            <div class="ico">📁</div>
-            <div class="name">{sub.name}</div>
-            <div class="cnt">{sub.items} items</div>
-          </a>
-        {/each}
-      </div>
-    </section>
+  {#if loading}
+    <div class="loading">Loading…</div>
+  {:else}
+    {#if folders.length > 0}
+      <section>
+        <h3>Subfolders</h3>
+        <div class="folder-cards">
+          {#each folders as sub}
+            <a class="fcard" href={`/browse/${sub.path.split('/').map(encodeURIComponent).join('/')}`}
+               on:click|preventDefault={() => currentFolderPath.set(sub.path)}>
+              <div class="ico">📁</div>
+              <div class="name">{sub.name}</div>
+              <div class="cnt">{sub.items} items</div>
+            </a>
+          {/each}
+        </div>
+      </section>
+    {/if}
+    <Grid files={files} on:context={onContext} />
   {/if}
-  <Grid files={files} on:context={onContext} />
-{/if}
+</div>
 
 {#if menu}
   <ContextMenu x={menu.x} y={menu.y} items={contextItems(menu.file)} onClose={() => (menu = null)} />
@@ -120,7 +149,8 @@
 {/if}
 
 {#if uploading}
-  <UploadDialog path={$currentFolderPath} onClose={() => (uploading = false)} onDone={load} />
+  <UploadDialog path={$currentFolderPath} initialFiles={droppedFiles}
+    onClose={() => { uploading = false; droppedFiles = []; }} onDone={load} />
 {/if}
 
 {#if showNewFolder}
@@ -140,6 +170,8 @@
 {/if}
 
 <style>
+  .browse-root { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .browse-root.dragging { outline: 2px dashed var(--accent); outline-offset: -8px; }
   .toolbar { display: flex; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); align-items: center; }
   .spacer { flex: 1; }
   .loading { padding: 20px; color: var(--fg-dim); }
