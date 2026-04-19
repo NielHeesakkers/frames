@@ -10,13 +10,15 @@ import (
 
 	"github.com/NielHeesakkers/frames/internal/auth"
 	"github.com/NielHeesakkers/frames/internal/db"
+	"github.com/NielHeesakkers/frames/internal/scanner"
 )
 
 type Deps struct {
-	Log     *slog.Logger
-	DB      *db.DB
-	Limiter *auth.LoginLimiter
-	Secure  bool
+	Log       *slog.Logger
+	DB        *db.DB
+	Limiter   *auth.LoginLimiter
+	Scheduler *scanner.Scheduler
+	Secure    bool
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -39,6 +41,9 @@ func NewRouter(d Deps) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireLogin(d.DB))
 			r.Get("/me", handleMe)
+
+			sd := &scanDeps{Scheduler: d.Scheduler}
+			r.Post("/scan", sd.handleTrigger)
 		})
 	})
 

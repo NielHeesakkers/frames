@@ -16,6 +16,7 @@ import (
 	"github.com/NielHeesakkers/frames/internal/config"
 	"github.com/NielHeesakkers/frames/internal/db"
 	"github.com/NielHeesakkers/frames/internal/logger"
+	"github.com/NielHeesakkers/frames/internal/scanner"
 )
 
 func main() {
@@ -53,9 +54,20 @@ func run() error {
 		log.Info("admin user created", "username", cfg.AdminUsername)
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	sc := &scanner.Scanner{DB: database, Log: log, Root: cfg.PhotosRoot}
+	sched := &scanner.Scheduler{
+		Scanner: sc, Interval: cfg.ScanInterval,
+		FullCron: cfg.FullScanCron, Log: log,
+	}
+	sched.Start(ctx)
+	defer sched.Stop()
+
 	lim := auth.NewLoginLimiter(5, 15*time.Minute)
 	h := api.NewRouter(api.Deps{
-		Log: log, DB: database, Limiter: lim,
+		Log: log, DB: database, Limiter: lim, Scheduler: sched,
 		Secure: strings.HasPrefix(cfg.PublicURL, "https://"),
 	})
 	srv := &http.Server{
@@ -63,9 +75,6 @@ func run() error {
 		Handler:           h,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	errCh := make(chan error, 1)
 	go func() {
