@@ -12,8 +12,15 @@
   $: hasNext = index >= 0 && index < neighbors.length - 1;
 
   function close() {
-    if (window.history.length > 1) window.history.back();
-    else goto('/browse');
+    // Go to the containing folder. history.back() would walk back through
+    // every photo you visited with ← → instead of actually closing.
+    const rel = (file?.relative_path ?? '') as string;
+    const parent = rel.split('/').slice(0, -1).join('/');
+    if (parent) {
+      goto('/browse/' + parent.split('/').map(encodeURIComponent).join('/'));
+    } else {
+      goto('/browse');
+    }
   }
   function prev() { if (hasPrev) goto(`/file/${neighbors[index - 1]}`); }
   function next() { if (hasNext) goto(`/file/${neighbors[index + 1]}`); }

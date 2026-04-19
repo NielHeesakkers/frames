@@ -2,6 +2,13 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.17.0 — 2026-04-19
+
+- Lightbox close (✕ / Esc) now navigates to the containing folder
+  instead of walking `history.back()`. Previously, after flipping through
+  photos with → → →, clicking ✕ would just undo one step instead of
+  actually closing the preview.
+
 ## 0.16.0 — 2026-04-19
 
 - Lightbox layout fix: previous version had 4 grid items in a 3-column
