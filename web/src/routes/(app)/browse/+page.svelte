@@ -16,6 +16,9 @@
 
   let latestFiles: any[] = [];
   let latestFolders: any[] = [];
+  // Latest photos in the current folder's subtree — used as a preview when the
+  // folder has no direct photos of its own.
+  let subtreeLatest: any[] = [];
 
   let menu: { file: any; x: number; y: number } | null = null;
   let confirmDelete: any = null;
@@ -47,9 +50,20 @@
         latestFiles = [];
         latestFolders = [];
       }
+      subtreeLatest = [];
     } else {
       latestFiles = [];
       latestFolders = [];
+      if (files.length === 0) {
+        try {
+          const l = await api.latest(10, 0, $currentFolderPath);
+          subtreeLatest = l.files;
+        } catch {
+          subtreeLatest = [];
+        }
+      } else {
+        subtreeLatest = [];
+      }
     }
     loading = false;
   }
@@ -140,25 +154,9 @@
         </section>
       {/if}
 
-      {#if atRoot && latestFolders.length > 0}
+      {#if !atRoot && folders.length > 0}
         <section>
-          <h3>Laatste toegevoegde mappen</h3>
-          <div class="folder-cards">
-            {#each latestFolders as sub}
-              <a class="fcard" href={`/browse/${sub.path.split('/').map(encodeURIComponent).join('/')}`}
-                 on:click|preventDefault={() => currentFolderPath.set(sub.path)}>
-                <div class="ico">📁</div>
-                <div class="name">{sub.name}</div>
-                <div class="cnt">{sub.items} items</div>
-              </a>
-            {/each}
-          </div>
-        </section>
-      {/if}
-
-      {#if folders.length > 0}
-        <section>
-          <h3>{atRoot ? 'Alle mappen' : 'Submappen'}</h3>
+          <h3>Submappen</h3>
           <div class="folder-cards">
             {#each folders as sub}
               <a class="fcard" href={`/browse/${sub.path.split('/').map(encodeURIComponent).join('/')}`}
@@ -175,10 +173,19 @@
       {#if !atRoot}
         <section class="files-section">
           <h3>Foto's{files.length > 0 ? ` (${files.length})` : ''}</h3>
-          {#if files.length === 0}
-            <div class="empty">Geen foto's in deze map. Kies een submap of upload nieuwe bestanden.</div>
-          {:else}
+          {#if files.length > 0}
             <Grid files={files} on:context={onContext} />
+          {:else if subtreeLatest.length > 0}
+            <p class="sub-caption">Laatste toegevoegd in deze map (submappen inbegrepen)</p>
+            <div class="latest-grid">
+              {#each subtreeLatest as lf}
+                <a class="latest-cell" href={`/file/${lf.id}`}>
+                  <img src={`/api/thumb/${lf.id}`} alt={lf.name} loading="lazy" />
+                </a>
+              {/each}
+            </div>
+          {:else}
+            <div class="empty">Geen foto's in deze map. Kies een submap of upload nieuwe bestanden.</div>
           {/if}
         </section>
       {/if}
@@ -250,4 +257,5 @@
   .latest-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .files-section { display: flex; flex-direction: column; min-height: 0; }
   .empty { padding: 16px; color: var(--fg-dim); font-style: italic; }
+  .sub-caption { margin: 0 16px 6px; color: var(--fg-dim); font-size: 12px; font-style: italic; }
 </style>

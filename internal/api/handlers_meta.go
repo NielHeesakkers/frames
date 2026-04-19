@@ -2,6 +2,7 @@
 package api
 
 import (
+	"database/sql"
 	"net/http"
 	"strconv"
 
@@ -40,21 +41,49 @@ type latestFolderDTO struct {
 	Items int64  `json:"items"`
 }
 
-// handleLatest returns the most recently added files and folders by insertion order.
-// Used by the home view to show "Latest additions" above the folder grid.
+// handleLatest returns the most recently added files and folders by insertion
+// order. Optional `path` query parameter scopes results to that folder's entire
+// subtree — useful when showing "Latest photos in this folder" for a container
+// folder that has no direct files of its own.
 func (md *metaDeps) handleLatest(w http.ResponseWriter, r *http.Request) {
 	filesLimit := clampInt(r.URL.Query().Get("files"), 10, 1, 50)
-	foldersLimit := clampInt(r.URL.Query().Get("folders"), 10, 1, 50)
+	foldersLimit := clampInt(r.URL.Query().Get("folders"), 10, 0, 50)
+	scopePath := r.URL.Query().Get("path")
 
 	filesOut := make([]latestFileDTO, 0, filesLimit)
-	rows, err := md.DB.Query(`
-		SELECT id, filename, kind, mime_type, folder_id, relative_path, taken_at
-		FROM files
-		WHERE kind IN ('image','raw','video')
-		ORDER BY id DESC
-		LIMIT ?
-	`, filesLimit)
-	if err == nil {
+
+	var rows *sql.Rows
+	var err error
+	if scopePath == "" {
+		rows, err = md.DB.Query(`
+			SELECT id, filename, kind, mime_type, folder_id, relative_path, taken_at
+			FROM files
+			WHERE kind IN ('image','raw','video')
+			ORDER BY id DESC
+			LIMIT ?
+		`, filesLimit)
+	} else {
+		folder, ferr := md.DB.FolderByPath(scopePath)
+		if ferr != nil {
+			WriteJSON(w, http.StatusOK, map[string]any{
+				"data": map[string]any{"files": filesOut, "folders": []latestFolderDTO{}},
+			})
+			return
+		}
+		rows, err = md.DB.Query(`
+			WITH RECURSIVE subtree(id) AS (
+				SELECT ? UNION ALL
+				SELECT f.id FROM folders f JOIN subtree s ON f.parent_id = s.id
+			)
+			SELECT id, filename, kind, mime_type, folder_id, relative_path, taken_at
+			FROM files
+			WHERE folder_id IN (SELECT id FROM subtree)
+			  AND kind IN ('image','raw','video')
+			ORDER BY id DESC
+			LIMIT ?
+		`, folder.ID, filesLimit)
+	}
+	if err == nil && rows != nil {
 		defer rows.Close()
 		for rows.Next() {
 			var f latestFileDTO
@@ -68,21 +97,23 @@ func (md *metaDeps) handleLatest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	foldersOut := make([]latestFolderDTO, 0, foldersLimit)
-	frows, err := md.DB.Query(`
-		SELECT id, path, name, item_count
-		FROM folders
-		WHERE path != ''
-		ORDER BY id DESC
-		LIMIT ?
-	`, foldersLimit)
-	if err == nil {
-		defer frows.Close()
-		for frows.Next() {
-			var fl latestFolderDTO
-			if err := frows.Scan(&fl.ID, &fl.Path, &fl.Name, &fl.Items); err != nil {
-				continue
+	if foldersLimit > 0 && scopePath == "" {
+		frows, err := md.DB.Query(`
+			SELECT id, path, name, item_count
+			FROM folders
+			WHERE path != ''
+			ORDER BY id DESC
+			LIMIT ?
+		`, foldersLimit)
+		if err == nil {
+			defer frows.Close()
+			for frows.Next() {
+				var fl latestFolderDTO
+				if err := frows.Scan(&fl.ID, &fl.Path, &fl.Name, &fl.Items); err != nil {
+					continue
+				}
+				foldersOut = append(foldersOut, fl)
 			}
-			foldersOut = append(foldersOut, fl)
 		}
 	}
 

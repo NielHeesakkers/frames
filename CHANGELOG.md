@@ -2,6 +2,18 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.7.0 — 2026-04-19
+
+- Home view cleaned up: "Laatste toegevoegde mappen" and "Alle mappen"
+  sections removed from root — the folder tree in the sidebar already
+  covers navigation. Home now shows only the latest photos.
+- Inside a container folder that has no direct photos of its own (like
+  `2018 Berlin` that only holds `RAW` and `JPG` subfolders), the FOTO'S
+  section now previews the 10 most recently added photos from anywhere
+  in that subtree instead of showing an empty-state message.
+- Backend: `/api/latest` gained an optional `path` query parameter that
+  scopes results to a folder's entire subtree via a recursive CTE.
+
 ## 0.6.0 — 2026-04-19
 
 - Admin Scan section cleaned up. Two side-by-side cards with a one-line

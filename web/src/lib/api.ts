@@ -92,9 +92,9 @@ export const api = {
     req<void>('POST', '/api/account/password', { old, new: neo }),
 
   version: () => req<{ version: string; changelog: string }>('GET', '/api/version'),
-  latest: (filesLimit = 10, foldersLimit = 10) =>
-    req<{ files: any[]; folders: any[] }>(
-      'GET',
-      `/api/latest?files=${filesLimit}&folders=${foldersLimit}`
-    )
+  latest: (filesLimit = 10, foldersLimit = 10, path?: string) => {
+    const q = new URLSearchParams({ files: String(filesLimit), folders: String(foldersLimit) });
+    if (path) q.set('path', path);
+    return req<{ files: any[]; folders: any[] }>('GET', `/api/latest?${q}`);
+  }
 };
