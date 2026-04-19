@@ -2,6 +2,23 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.35.0 — 2026-04-19
+
+- Slideshow removed (play/pause button, interval selector, spacebar
+  shortcut, changelog entry all gone).
+
+- Respect EXIF orientation when storing image dimensions. Portraits shot
+  with a "sideways" camera sensor store as 4000×3000 landscape with an
+  orientation flag that says "rotate 90° CW" — the thumbnail pipeline
+  already rotates the pixels correctly but the stored width/height were
+  raw-sensor, so the justified-rows layout laid those photos out wide.
+  Now, when orientation is 5..8 we swap width/height before saving.
+  Also applies to the on-demand EXIF panel in the lightbox.
+
+  **To fix existing photos**: Admin → **Clear cache**. The worker will
+  re-run metadata extraction and write correct dimensions. Layouts
+  reflect it on the next folder load.
+
 ## 0.34.0 — 2026-04-19
 
 - Fix "Oorspronkelijke verhouding" rendering everything as squares. The

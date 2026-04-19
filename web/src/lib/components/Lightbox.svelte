@@ -18,34 +18,6 @@
     }
   }
 
-  // Slideshow state.
-  let playing = false;
-  let playInterval = 4;  // seconds
-  let playTimer: any = null;
-
-  function stopPlay() {
-    playing = false;
-    if (playTimer) { clearTimeout(playTimer); playTimer = null; }
-  }
-  function scheduleStep() {
-    if (playTimer) clearTimeout(playTimer);
-    playTimer = setTimeout(() => {
-      if (hasNext) {
-        next();
-      } else {
-        stopPlay();
-      }
-    }, playInterval * 1000);
-  }
-  function togglePlay() {
-    if (playing) { stopPlay(); return; }
-    if (!hasNext) return;
-    playing = true;
-    scheduleStep();
-  }
-  // Re-schedule whenever the file changes while playing.
-  $: if (playing && file) scheduleStep();
-
   // Shortcut overlay.
   let showHelp = false;
 
@@ -76,7 +48,6 @@
     else if (e.key === '+' || e.key === '=') setZoom(zoom * 1.25);
     else if (e.key === '-' || e.key === '_') setZoom(zoom / 1.25);
     else if (e.key === '0') resetZoom();
-    else if (e.key === ' ') { e.preventDefault(); togglePlay(); }
     else if (e.key === '?') showHelp = !showHelp;
   }
   onMount(() => window.addEventListener('keydown', onKey));
@@ -155,15 +126,6 @@
 
 <div class="lightbox">
   <div class="topbar">
-    <button class="iconbtn" on:click={togglePlay} title={playing ? 'Pauze (spatie)' : 'Slideshow (spatie)'}>
-      {playing ? '⏸' : '▶'}
-    </button>
-    <select bind:value={playInterval} class="interval" title="Slideshow-interval">
-      <option value={2}>2 s</option>
-      <option value={4}>4 s</option>
-      <option value={7}>7 s</option>
-      <option value={10}>10 s</option>
-    </select>
     <button class="iconbtn" on:click={() => (showHelp = !showHelp)} title="Sneltoetsen (?)">?</button>
   </div>
   <button class="close" on:click={close} title="Sluiten (Esc)">✕</button>
@@ -282,7 +244,6 @@
         <dl>
           <dt>← →</dt><dd>Vorige / volgende foto</dd>
           <dt>Esc</dt><dd>Sluiten</dd>
-          <dt>Space</dt><dd>Slideshow play / pauze</dd>
           <dt>+ / −</dt><dd>Zoom in / uit</dd>
           <dt>0</dt><dd>Zoom reset</dd>
           <dt>1 … 5</dt><dd>Rating (met muis op thumb)</dd>
@@ -316,10 +277,6 @@
     color: #fff; border-radius: 50%; width: 36px; height: 36px;
     display: grid; place-items: center; cursor: pointer; font-size: 14px; }
   .iconbtn:hover { background: rgba(255,255,255,0.16); }
-  .interval { background: rgba(255,255,255,0.08); color: #fff;
-    border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;
-    padding: 6px 8px; font-size: 12px; }
-
   .help-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.7);
     z-index: 120; display: grid; place-items: center; }
   .help { background: var(--bg-2); border: 1px solid var(--border);

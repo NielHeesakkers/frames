@@ -49,12 +49,22 @@ func ReadMetadata(ctx context.Context, src string) (db.MetadataUpdate, error) {
 			up.TakenAt = &t
 		}
 	}
-	if e.ImageWidth > 0 {
-		w := e.ImageWidth
+	// Swap width/height when EXIF orientation indicates a 90° rotation
+	// (5,6,7,8 are the "sideways" orientations). We want stored dimensions
+	// to match the *displayed* image, which is what layout code and the
+	// lightbox need.
+	w := e.ImageWidth
+	h := e.ImageHeight
+	if e.Orientation != nil {
+		o := parseOrientation(e.Orientation)
+		if o >= 5 && o <= 8 {
+			w, h = h, w
+		}
+	}
+	if w > 0 {
 		up.Width = &w
 	}
-	if e.ImageHeight > 0 {
-		h := e.ImageHeight
+	if h > 0 {
 		up.Height = &h
 	}
 	if e.Make != "" {
@@ -65,7 +75,7 @@ func ReadMetadata(ctx context.Context, src string) (db.MetadataUpdate, error) {
 		m := strings.TrimSpace(e.Model)
 		up.CameraModel = &m
 	}
-	// Orientation: exiftool returns either integer 1-8 or descriptive string.
+	// Orientation stored as an integer 1-8 (EXIF orientation).
 	if e.Orientation != nil {
 		o := parseOrientation(e.Orientation)
 		if o > 0 {
@@ -74,6 +84,8 @@ func ReadMetadata(ctx context.Context, src string) (db.MetadataUpdate, error) {
 	}
 	return up, nil
 }
+
+// Also swap Width/Height on the detailed EXIF view when orientation is rotated.
 
 // DetailedEXIF holds a richer EXIF summary pulled on demand (e.g. when the
 // lightbox is opened). These fields are not persisted to the DB — they are
@@ -148,6 +160,13 @@ func ReadDetailedEXIF(ctx context.Context, src string) (DetailedEXIF, error) {
 	}
 	d.Width = intFrom(e, "ImageWidth")
 	d.Height = intFrom(e, "ImageHeight")
+	// Swap when the photo is side-oriented (EXIF orientation 5..8).
+	if rawO, ok := e["Orientation"]; ok && rawO != nil {
+		o := parseOrientation(rawO)
+		if o >= 5 && o <= 8 {
+			d.Width, d.Height = d.Height, d.Width
+		}
+	}
 	d.GPSLat = strFrom(e, "GPSLatitude")
 	d.GPSLon = strFrom(e, "GPSLongitude")
 	d.Software = strFrom(e, "Software")
