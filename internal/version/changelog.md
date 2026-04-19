@@ -2,6 +2,14 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.29.0 — 2026-04-19
+
+- Justified grid rewritten as pure CSS (flex-grow per aspect ratio).
+  No JS layout pass, so it reflows live with every pixel of browser
+  resize. Every row fills the container width exactly; a phantom
+  flex-filler absorbs slack on half-full trailing rows so items don't
+  stretch to 2× width.
+
 ## 0.28.0 — 2026-04-19
 
 - Grid width is now driven by `bind:clientWidth`, so the justified rows

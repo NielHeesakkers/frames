@@ -40,78 +40,29 @@
     return out;
   })();
 
-  // Justified layout: for each row, scale items so they fill container width
-  // exactly, preserving aspect ratios and row height near `targetH`.
-  const gap = 4;
-  const padSide = 8; // matches grid padding
-
-  // Svelte's `bind:clientWidth` updates containerWidth whenever the element's
-  // rendered width changes (ResizeObserver under the hood). This is more
-  // reliable than a manual observer + window-resize combo.
-  let containerWidth = 0;
-
-  type Sized = { file: any; h: number };
-  function buildRows(list: any[], W: number, targetH: number): Sized[][] {
-    const avail = Math.max(40, W - 2 * padSide);
-    const rows: Sized[][] = [];
-    let cur: { file: any; aspect: number }[] = [];
-    let curAspects = 0;
-    for (const f of list) {
-      const a = f.width && f.height ? f.width / f.height : 1;
-      // Pre-compute the row height that this new row would get *if* we added
-      // the current file to it. If that height is < 70% of targetH, the row
-      // has too much content — close it before adding.
-      const projectedAspects = curAspects + a;
-      const projectedRowW = projectedAspects * targetH + Math.max(0, cur.length) * gap;
-      if (cur.length > 0 && projectedRowW > avail * 1.35) {
-        // Close current row (scale to fit width).
-        rows.push(closeRow(cur, avail, targetH, /*capUpscale*/ false));
-        cur = [];
-        curAspects = 0;
-      }
-      cur.push({ file: f, aspect: a });
-      curAspects += a;
-      // If the row is now visually full (scaled width ~= available), close it.
-      const fullW = curAspects * targetH + (cur.length - 1) * gap;
-      if (fullW >= avail) {
-        rows.push(closeRow(cur, avail, targetH, false));
-        cur = [];
-        curAspects = 0;
-      }
-    }
-    // Trailing (incomplete) row — don't upscale beyond targetH.
-    if (cur.length > 0) rows.push(closeRow(cur, avail, targetH, /*capUpscale*/ true));
-    return rows;
+  function aspect(f: any): number {
+    return f.width && f.height ? f.width / f.height : 1;
   }
-
-  function closeRow(row: { file: any; aspect: number }[], avail: number, targetH: number, capUpscale: boolean): Sized[] {
-    const sumA = row.reduce((s, x) => s + x.aspect, 0);
-    if (sumA <= 0) return [];
-    const rowAvail = avail - (row.length - 1) * gap;
-    let h = rowAvail / sumA;
-    if (capUpscale && h > targetH * 1.25) h = targetH; // trailing row: don't stretch to fill
-    return row.map((x) => ({ file: x.file, h: Math.max(40, Math.round(h)) }));
-  }
-
-  $: rowsAll = $thumbShape === 'original' && containerWidth > 0
-    ? buildRows(files, containerWidth, itemSize) : null;
-  $: rowsPerGroup = $thumbShape === 'original' && containerWidth > 0 && groups
-    ? groups.map(g => ({ ...g, rows: buildRows(g.items, containerWidth, itemSize) }))
-    : null;
 </script>
 
-<div class="timeline" bind:clientWidth={containerWidth} style="--size: {itemSize}px">
+<div class="timeline" style="--size: {itemSize}px">
   {#if groups}
-    {#each groups as g, gi (g.key)}
+    {#each groups as g (g.key)}
       <h4 class="month">{g.label} <span class="count">· {g.items.length}</span></h4>
-      {#if $thumbShape === 'original' && rowsPerGroup}
-        {#each rowsPerGroup[gi].rows as row, ri (ri)}
-          <div class="jrow">
-            {#each row as it (it.file.id)}
-              <GridItem file={it.file} size={it.h} on:context />
-            {/each}
-          </div>
-        {/each}
+      {#if $thumbShape === 'original'}
+        <div class="jgrid">
+          {#each g.items as f (f.id)}
+            <div class="jslot"
+                 style="flex-grow: {aspect(f)}; flex-basis: calc({aspect(f)} * var(--size));
+                        min-width: calc({aspect(f)} * var(--size) * 0.55);
+                        aspect-ratio: {aspect(f)};">
+              <GridItem file={f} size={itemSize} on:context />
+            </div>
+          {/each}
+          <!-- A final greedy "invisible" item keeps the last row from
+               stretching items absurdly wide when it's half-full. -->
+          <div class="jfiller" />
+        </div>
       {:else}
         <div class="sq">
           {#each g.items as f (f.id)}
@@ -120,14 +71,18 @@
         </div>
       {/if}
     {/each}
-  {:else if $thumbShape === 'original' && rowsAll}
-    {#each rowsAll as row, ri (ri)}
-      <div class="jrow">
-        {#each row as it (it.file.id)}
-          <GridItem file={it.file} size={it.h} on:context />
-        {/each}
-      </div>
-    {/each}
+  {:else if $thumbShape === 'original'}
+    <div class="jgrid">
+      {#each files as f (f.id)}
+        <div class="jslot"
+             style="flex-grow: {aspect(f)}; flex-basis: calc({aspect(f)} * var(--size));
+                    min-width: calc({aspect(f)} * var(--size) * 0.55);
+                    aspect-ratio: {aspect(f)};">
+          <GridItem file={f} size={itemSize} on:context />
+        </div>
+      {/each}
+      <div class="jfiller" />
+    </div>
   {:else}
     <div class="sq">
       {#each files as f (f.id)}
@@ -138,13 +93,19 @@
 </div>
 
 <style>
-  /* No inner overflow — the enclosing `.scroll` in BrowseView already scrolls
-     the page, preventing a double scrollbar. */
   .timeline { display: flex; flex-direction: column;
     content-visibility: auto; padding: 0 8px 14px; width: 100%; }
   .sq { display: grid; grid-template-columns: repeat(auto-fill, var(--size));
     gap: 4px; padding-bottom: 10px; }
-  .jrow { display: flex; gap: 4px; margin-bottom: 4px; }
+  /* Justified rows via flexbox: each slot's flex-grow + flex-basis are its
+     aspect ratio. Rows wrap and distribute leftover space proportionally,
+     so they always fill container width exactly. */
+  .jgrid { display: flex; flex-wrap: wrap; gap: 4px; padding-bottom: 10px; }
+  .jslot { height: auto; min-height: 60px; position: relative; }
+  /* Force the nested GridItem to fill the slot. */
+  .jslot :global(> .item) { width: 100% !important; height: 100% !important; }
+  /* Absorbs slack so a half-full last row doesn't stretch items to 2×+ width. */
+  .jfiller { flex: 99 1 0; height: 0; pointer-events: none; }
   .month { position: sticky; top: 0; z-index: 2;
     background: var(--bg); margin: 0; padding: 14px 2px 8px;
     font-size: 13px; font-weight: 600; color: var(--fg);
