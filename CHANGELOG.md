@@ -2,6 +2,13 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.3.0 — 2026-04-19
+
+- Recursive folder tree in the sidebar — drill into any depth. Clicking a
+  folder name now navigates AND expands it inline, so siblings stay
+  visible and you can see the full path you're in. The chevron on the
+  left still toggles expansion without navigating.
+
 ## 0.2.0 — 2026-04-19
 
 - Inside a folder, show a "Foto's (n)" heading above the grid and an
