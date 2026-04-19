@@ -23,12 +23,36 @@ export async function logout() {
 
 export const currentFolderPath = writable<string>('');
 export const selection = writable<Set<number>>(new Set());
-export const sortMode = writable<'takenAt' | 'name' | 'size' | 'rating'>('takenAt');
-export const density = writable<'small' | 'medium' | 'large'>('medium');
+
+/**
+ * `persisted` wraps a writable so the value round-trips through localStorage.
+ * The key namespace is `frames.<name>.v1` so future migrations can bump it.
+ */
+function persisted<T>(key: string, def: T): import('svelte/store').Writable<T> {
+  const storageKey = `frames.${key}.v1`;
+  let initial: T = def;
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw != null) initial = JSON.parse(raw) as T;
+    } catch {
+      /* corrupt entry, fall back */
+    }
+  }
+  const s = writable<T>(initial);
+  s.subscribe((v) => {
+    if (typeof localStorage === 'undefined') return;
+    try { localStorage.setItem(storageKey, JSON.stringify(v)); } catch {}
+  });
+  return s;
+}
+
+export const sortMode = persisted<'takenAt' | 'name' | 'size' | 'rating'>('sortMode', 'takenAt');
+export const density = persisted<'small' | 'medium' | 'large'>('density', 'medium');
 
 /** Thumbnail shape in the grid. 'square' = uniform squares (crop via object-fit:cover),
  *  'original' = preserve each photo's aspect ratio in a justified-rows layout. */
-export const thumbShape = writable<'square' | 'original'>('square');
+export const thumbShape = persisted<'square' | 'original'>('thumbShape', 'square');
 
 /**
  * Paths of folders the user has expanded in the sidebar tree. Persisted to

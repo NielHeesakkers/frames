@@ -2,6 +2,12 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.26.0 — 2026-04-19
+
+- Toolbar choices (sort, density, thumbnail shape) are now persisted to
+  `localStorage` and restored on page load. Added a small `persisted()`
+  helper in `stores.ts` so the three stores share the same mechanism.
+
 ## 0.25.0 — 2026-04-19
 
 - Sidebar footer simplified to a single **Settings** link. The Settings,
