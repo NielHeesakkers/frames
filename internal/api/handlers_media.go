@@ -143,7 +143,10 @@ func serveWithETag(w http.ResponseWriter, r *http.Request, path, etag, mime stri
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	// Short max-age + must-revalidate: SQLite can recycle file IDs after a
+	// library reset, so `immutable` would keep stale thumbs in the browser
+	// cache forever. ETag-based revalidation stays cheap (304 on hit).
+	w.Header().Set("Cache-Control", "public, max-age=60, must-revalidate")
 	if mime != "" {
 		w.Header().Set("Content-Type", mime)
 	}

@@ -81,7 +81,7 @@
            poster={`/api/thumb/${file.id}`}
            muted autoplay loop playsinline></video>
   {:else}
-    <img src={`/api/thumb/${file.id}`} loading="lazy" alt={file.name} />
+    <img src={`/api/thumb/${file.id}?v=${file.mtime ?? 0}`} loading="lazy" alt={file.name} />
   {/if}
 
   {#if file.kind === 'video'}<span class="badge">▶</span>{/if}

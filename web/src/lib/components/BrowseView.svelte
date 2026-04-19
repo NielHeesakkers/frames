@@ -159,7 +159,7 @@
           <div class="latest-grid">
             {#each latestFiles as lf}
               <a class="latest-cell" href={`/file/${lf.id}`}>
-                <img src={`/api/thumb/${lf.id}`} alt={lf.name} loading="lazy" />
+                <img src={`/api/thumb/${lf.id}?v=${lf.mtime ?? 0}`} alt={lf.name} loading="lazy" />
               </a>
             {/each}
           </div>
@@ -191,7 +191,7 @@
             <div class="latest-grid">
               {#each subtreeLatest as lf}
                 <a class="latest-cell" href={`/file/${lf.id}`}>
-                  <img src={`/api/thumb/${lf.id}`} alt={lf.name} loading="lazy" />
+                  <img src={`/api/thumb/${lf.id}?v=${lf.mtime ?? 0}`} alt={lf.name} loading="lazy" />
                 </a>
               {/each}
             </div>

@@ -2,6 +2,16 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.31.0 — 2026-04-19
+
+- Fix stale thumbnails after "Reset library". SQLite recycles low file
+  IDs when rows are deleted, so the browser's cache for `/api/thumb/1`
+  would hold a Berlin photo while the new library has a Thailand photo
+  at ID 1. Two-sided fix: frontend appends `?v=<mtime>` to thumb and
+  preview URLs (different mtime = different cache entry), and the
+  backend downgraded `Cache-Control` from `immutable` to a 60-second
+  revalidate so the ETag check can actually run.
+
 ## 0.30.0 — 2026-04-19
 
 - **Live scan progress** in admin. While a scan is running, a pulsing

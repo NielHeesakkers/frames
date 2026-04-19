@@ -178,7 +178,7 @@
     {:else if file.kind === 'other'}
       <a class="download-fallback" href={`/api/original/${file.id}`}>Download {file.name}</a>
     {:else}
-      <img src={`/api/preview/${file.id}`} alt={file.name}
+      <img src={`/api/preview/${file.id}?v=${file.mtime ?? 0}`} alt={file.name}
            style="transform: translate({panX}px, {panY}px) scale({zoom}); cursor: {zoom > 1 ? (panning ? 'grabbing' : 'grab') : 'zoom-in'}"
            on:mousedown={onMouseDown}
            on:dblclick={() => (zoom === 1 ? setZoom(2) : resetZoom())}
@@ -269,7 +269,7 @@
     <div class="filmstrip" bind:this={stripEl}>
       {#each neighbors as id, i (id)}
         <a class="strip-thumb" class:active={i === index} href={`/file/${id}`}>
-          <img src={`/api/thumb/${id}`} alt="" loading="lazy" />
+          <img src={`/api/thumb/${id}`} alt="" loading="lazy" /><!-- filmstrip uses id only -->
         </a>
       {/each}
     </div>
