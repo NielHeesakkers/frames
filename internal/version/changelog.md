@@ -2,6 +2,13 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.18.0 — 2026-04-19
+
+- Share dialog: "Copy link" now copies AND closes the dialog in one
+  click. Primary action rightmost, with a secondary "Done" in case you
+  just want to dismiss. Falls back to `execCommand('copy')` on non-HTTPS
+  contexts so copying still works over plain HTTP.
+
 ## 0.17.0 — 2026-04-19
 
 - Lightbox close (✕ / Esc) now navigates to the containing folder

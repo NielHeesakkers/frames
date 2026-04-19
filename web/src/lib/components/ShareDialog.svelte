@@ -29,6 +29,27 @@
       busy = false;
     }
   }
+
+  async function copyAndClose() {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(created.url);
+      } else {
+        // Fallback for non-HTTPS contexts: legacy execCommand path.
+        const ta = document.createElement('textarea');
+        ta.value = created.url;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    } catch {
+      // Even if copying fails, still close; user can select the URL manually.
+    }
+    onClose();
+  }
 </script>
 
 <div class="backdrop" on:click={onClose}>
@@ -50,8 +71,8 @@
       <p>Share created:</p>
       <input readonly value={created.url} on:focus={(e) => e.currentTarget.select()} style="width:100%" />
       <div class="actions">
-        <button on:click={() => navigator.clipboard.writeText(created.url)}>Copy link</button>
-        <button class="primary" on:click={onClose}>Done</button>
+        <button on:click={onClose}>Done</button>
+        <button class="primary" on:click={copyAndClose}>Copy link</button>
       </div>
     {/if}
   </div>
