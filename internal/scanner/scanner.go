@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/NielHeesakkers/frames/internal/db"
 )
@@ -20,8 +21,25 @@ type Stats struct {
 	Scanned, Added, Updated, Removed int64
 }
 
+// ProgressTracker exposes live counters that handleDir will bump during the
+// walk. Fields are atomic pointers so an HTTP handler can read them while
+// the scan is still running.
+type ProgressTracker struct {
+	Folders *atomic.Int64
+	Scanned *atomic.Int64
+	Added   *atomic.Int64
+	Updated *atomic.Int64
+	Removed *atomic.Int64
+}
+
 // Scan performs one pass. If full is true, the mtime short-circuit is disabled.
 func (s *Scanner) Scan(ctx context.Context, full bool) (Stats, error) {
+	return s.ScanWithProgress(ctx, full, nil)
+}
+
+// ScanWithProgress is like Scan but reports live counters into `tracker` as
+// the walk proceeds. Pass nil to disable progress tracking.
+func (s *Scanner) ScanWithProgress(ctx context.Context, full bool, tracker *ProgressTracker) (Stats, error) {
 	kind := "incremental"
 	if full {
 		kind = "full"
@@ -46,7 +64,10 @@ func (s *Scanner) Scan(ctx context.Context, full bool) (Stats, error) {
 
 	var stats Stats
 	err = WalkDirs(ctx, s.Root, func(dir dirEntry, files []fileEntry) error {
-		return s.handleDir(dir, files, full, &stats)
+		if tracker != nil {
+			tracker.Folders.Add(1)
+		}
+		return s.handleDir(dir, files, full, &stats, tracker)
 	})
 	emsg := ""
 	if err != nil {
@@ -58,7 +79,7 @@ func (s *Scanner) Scan(ctx context.Context, full bool) (Stats, error) {
 	return stats, err
 }
 
-func (s *Scanner) handleDir(dir dirEntry, files []fileEntry, full bool, stats *Stats) error {
+func (s *Scanner) handleDir(dir dirEntry, files []fileEntry, full bool, stats *Stats, tracker *ProgressTracker) error {
 	// Ensure folder row exists; determine parent.
 	var parentID *int64
 	if dir.RelPath != "" {
@@ -122,6 +143,7 @@ func (s *Scanner) handleDir(dir dirEntry, files []fileEntry, full bool, stats *S
 	var toUpdate []db.FileStatUpdate
 	for _, fe := range files {
 		stats.Scanned++
+		if tracker != nil { tracker.Scanned.Add(1) }
 		keep = append(keep, fe.Name)
 		old, exists := byName[fe.Name]
 		kind, mime := Classify(fe.Name)
@@ -132,11 +154,13 @@ func (s *Scanner) handleDir(dir dirEntry, files []fileEntry, full bool, stats *S
 				Size: fe.Size, Mtime: fe.Mtime, MimeType: mime, Kind: kind,
 			})
 			stats.Added++
+			if tracker != nil { tracker.Added.Add(1) }
 			continue
 		}
 		if old.Mtime != fe.Mtime || old.Size != fe.Size {
 			toUpdate = append(toUpdate, db.FileStatUpdate{ID: old.ID, Mtime: fe.Mtime, Size: fe.Size})
 			stats.Updated++
+			if tracker != nil { tracker.Updated.Add(1) }
 		}
 	}
 	if err := s.DB.BulkInsertFiles(toInsert); err != nil {
@@ -160,6 +184,7 @@ func (s *Scanner) handleDir(dir dirEntry, files []fileEntry, full bool, stats *S
 		return err
 	}
 	stats.Removed += removed
+	if tracker != nil && removed > 0 { tracker.Removed.Add(removed) }
 
 	// Mark folder scanned with new mtime + count.
 	return s.DB.SetFolderScanned(folderID, dir.Mtime, int64(len(keep)))

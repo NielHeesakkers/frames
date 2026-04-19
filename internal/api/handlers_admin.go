@@ -17,8 +17,16 @@ import (
 )
 
 type adminDeps struct {
-	DB    *db.DB
-	Cache *thumbnail.Cache
+	DB        *db.DB
+	Cache     *thumbnail.Cache
+	Scheduler scanProgressProvider
+}
+
+// scanProgressProvider is the slice of *scanner.Scheduler we actually need,
+// kept as an interface to avoid a direct import cycle.
+type scanProgressProvider interface {
+	// Returns current progress. Caller doesn't need to know the concrete type.
+	ProgressJSON() any
 }
 
 type createUserReq struct {
@@ -86,12 +94,14 @@ func (ad *adminDeps) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 func (ad *adminDeps) handleScanStatus(w http.ResponseWriter, r *http.Request) {
 	last, _ := ad.DB.LastScanJob("incremental")
 	lastFull, _ := ad.DB.LastScanJob("full")
-	WriteJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"last_incremental": last,
-			"last_full":        lastFull,
-		},
-	})
+	out := map[string]any{
+		"last_incremental": last,
+		"last_full":        lastFull,
+	}
+	if ad.Scheduler != nil {
+		out["progress"] = ad.Scheduler.ProgressJSON()
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": out})
 }
 
 type changePasswordReq struct {

@@ -2,6 +2,18 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.30.0 — 2026-04-19
+
+- **Live scan progress** in admin. While a scan is running, a pulsing
+  "Bezig" card shows scan type, elapsed time, and live counters
+  (folders visited, files scanned, added/updated/removed). Backend
+  tracks counters in atomics so the poll is cheap; the frontend only
+  polls (`1 s`) while a scan is actually running.
+- The scan buttons are disabled while a scan is in flight.
+- `scripts/iterate-backend.sh` now only rebuilds the image + restarts
+  the existing Portainer-managed container instead of recreating one
+  with hardcoded env vars. Your Portainer stack config sticks.
+
 ## 0.29.0 — 2026-04-19
 
 - Justified grid rewritten as pure CSS (flex-grow per aspect ratio).

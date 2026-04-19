@@ -10,10 +10,34 @@
   let error = '';
   let scanMsg = '';
   let stats: any = null;
+  let scanStatus: any = null;
+  let pollTimer: any = null;
 
   async function load() {
     users = await api.listUsers();
     try { stats = await api.adminStats(); } catch {}
+    await pollScan();
+  }
+
+  async function pollScan() {
+    try {
+      scanStatus = await api.scanStatus();
+    } catch {}
+    // Keep polling while a scan is running.
+    if (scanStatus?.progress?.running) {
+      pollTimer = setTimeout(pollScan, 1000);
+    } else if (pollTimer) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function fmtDuration(startSec: number): string {
+    if (!startSec) return '';
+    const secs = Math.max(0, Math.floor(Date.now() / 1000 - startSec));
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
   }
 
   function fmtBytes(n: number): string {
@@ -40,6 +64,8 @@
     scanMsg = full ? 'Full scan gestart…' : 'Incremental scan gestart…';
     await api.scan(full);
     setTimeout(() => (scanMsg = ''), 4000);
+    // Kick progress polling immediately.
+    setTimeout(pollScan, 500);
   }
 
   let maintMsg = '';
@@ -125,14 +151,30 @@
 
   <section>
     <h3>Scan</h3>
+    {#if scanStatus?.progress?.running}
+      <div class="progress-card">
+        <div class="progress-head">
+          <span class="badge live">● Bezig</span>
+          <strong>{scanStatus.progress.type === 'full' ? 'Full' : 'Incremental'} scan</strong>
+          <span class="muted">{fmtDuration(scanStatus.progress.started_at)}</span>
+        </div>
+        <div class="progress-stats">
+          <span><b>{scanStatus.progress.folders_seen.toLocaleString()}</b> mappen</span>
+          <span><b>{scanStatus.progress.scanned.toLocaleString()}</b> bestanden</span>
+          <span>+<b>{scanStatus.progress.added.toLocaleString()}</b> nieuw</span>
+          <span>↻<b>{scanStatus.progress.updated.toLocaleString()}</b> gewijzigd</span>
+          <span>−<b>{scanStatus.progress.removed.toLocaleString()}</b> verwijderd</span>
+        </div>
+      </div>
+    {/if}
     <div class="scan">
       <div class="scan-item">
         <p class="explain">Kijkt alleen naar mappen waarvan de <em>modification time</em> veranderd is. Snel, gebruik dit voor een tussentijdse update.</p>
-        <button on:click={() => scanNow(false)}>Run incremental scan</button>
+        <button on:click={() => scanNow(false)} disabled={scanStatus?.progress?.running}>Run incremental scan</button>
       </div>
       <div class="scan-item">
         <p class="explain">Loopt door de hele library en negeert de mtime-optimalisatie. Trager, maar vangt alles op — inclusief edge cases en correcties na configuratiewijzigingen.</p>
-        <button on:click={() => scanNow(true)}>Run full scan</button>
+        <button on:click={() => scanNow(true)} disabled={scanStatus?.progress?.running}>Run full scan</button>
       </div>
     </div>
     {#if scanMsg}<p class="ok">{scanMsg}</p>{/if}
@@ -181,6 +223,16 @@
     padding: 3px 10px; border-radius: 12px; font-size: 12px; color: var(--fg-dim); }
   .pill strong { color: var(--fg); margin-right: 4px; }
   .muted { color: var(--fg-dim); font-size: 12px; }
+  .progress-card { background: var(--bg-2); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 16px 18px; margin: 8px 0 14px; }
+  .progress-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge.live { background: var(--accent); color: #fff; padding: 2px 8px;
+    border-radius: 10px; font-size: 11px; font-weight: 600; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .badge.live { animation: pulse 1.4s ease-in-out infinite; }
+  .progress-stats { display: flex; gap: 16px; flex-wrap: wrap;
+    color: var(--fg-dim); font-size: 13px; }
+  .progress-stats b { color: var(--fg); font-variant-numeric: tabular-nums; }
   @media (max-width: 720px) {
     .scan { grid-template-columns: 1fr; }
   }
