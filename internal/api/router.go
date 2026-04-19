@@ -93,6 +93,9 @@ func NewRouter(d Deps) http.Handler {
 
 			ud := &uploadDeps{Svc: d.UploadSvc, Queue: d.Queue, MaxBytes: d.MaxUpload}
 			r.Post("/upload", ud.handleUpload)
+
+			ad := &adminDeps{DB: d.DB}
+			r.Post("/account/password", ad.handleChangePassword)
 		})
 
 		// Admin-only routes (require login + admin).
@@ -100,6 +103,12 @@ func NewRouter(d Deps) http.Handler {
 			r.Use(auth.RequireLogin(d.DB), auth.RequireAdmin)
 			sh := &sharesDeps{DB: d.DB, PublicURL: d.PublicURL}
 			r.Get("/admin/shares", sh.handleListAllShares)
+
+			ad := &adminDeps{DB: d.DB}
+			r.Post("/admin/users", ad.handleCreateUser)
+			r.Get("/admin/users", ad.handleListUsers)
+			r.Delete("/admin/users/{id}", ad.handleDeleteUser)
+			r.Get("/admin/scan_status", ad.handleScanStatus)
 		})
 	})
 
