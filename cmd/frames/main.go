@@ -19,6 +19,7 @@ import (
 	"github.com/NielHeesakkers/frames/internal/logger"
 	"github.com/NielHeesakkers/frames/internal/scanner"
 	"github.com/NielHeesakkers/frames/internal/thumbnail"
+	"github.com/NielHeesakkers/frames/internal/upload"
 )
 
 func main() {
@@ -72,6 +73,7 @@ func run() error {
 		return err
 	}
 	q := thumbnail.NewQueue(4096)
+	uploadSvc := &upload.Service{DB: database, Root: cfg.PhotosRoot}
 	pool := &thumbnail.Pool{
 		DB: database, Cache: cache, Queue: q, Log: log,
 		Root: cfg.PhotosRoot, Workers: cfg.Workers,
@@ -84,6 +86,7 @@ func run() error {
 	h := api.NewRouter(api.Deps{
 		Log: log, DB: database, Limiter: lim, Scheduler: sched,
 		Cache: cache, Queue: q, Pool: pool, Ops: ops, Root: cfg.PhotosRoot,
+		UploadSvc: uploadSvc, MaxUpload: cfg.MaxUploadSize,
 		Secure:    strings.HasPrefix(cfg.PublicURL, "https://"),
 		PublicURL: cfg.PublicURL,
 	})

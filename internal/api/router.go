@@ -13,6 +13,7 @@ import (
 	"github.com/NielHeesakkers/frames/internal/fsops"
 	"github.com/NielHeesakkers/frames/internal/scanner"
 	"github.com/NielHeesakkers/frames/internal/thumbnail"
+	"github.com/NielHeesakkers/frames/internal/upload"
 )
 
 type Deps struct {
@@ -24,6 +25,8 @@ type Deps struct {
 	Queue     *thumbnail.Queue
 	Pool      *thumbnail.Pool
 	Ops       *fsops.Ops
+	UploadSvc *upload.Service
+	MaxUpload int64
 	Root      string
 	Secure    bool
 	PublicURL string
@@ -78,6 +81,9 @@ func NewRouter(d Deps) http.Handler {
 			r.Post("/ops/file/delete", od.handleDeleteFile)
 			r.Post("/ops/folder/rename", od.handleRenameFolder)
 			r.Post("/ops/folder/delete", od.handleDeleteFolder)
+
+			ud := &uploadDeps{Svc: d.UploadSvc, Queue: d.Queue, MaxBytes: d.MaxUpload}
+			r.Post("/upload", ud.handleUpload)
 		})
 	})
 
