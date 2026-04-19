@@ -126,3 +126,21 @@ func serveWithETag(w http.ResponseWriter, r *http.Request, path, etag, mime stri
 	fi, _ := fh.Stat()
 	http.ServeContent(w, r, filepath.Base(path), fi.ModTime(), fh)
 }
+
+// serveOriginalFile streams the backing original file with proper headers. Shared
+// between the authenticated media endpoint and the public share endpoint.
+func serveOriginalFile(w http.ResponseWriter, r *http.Request, root string, f *db.File) {
+	path := filepath.Join(root, f.RelativePath)
+	fh, err := os.Open(path)
+	if err != nil {
+		WriteError(w, http.StatusNotFound, "file missing")
+		return
+	}
+	defer fh.Close()
+	fi, _ := fh.Stat()
+	if f.MimeType != "" {
+		w.Header().Set("Content-Type", f.MimeType)
+	}
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename=%q`, f.Filename))
+	http.ServeContent(w, r, f.Filename, fi.ModTime(), fh)
+}

@@ -4,6 +4,7 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -12,6 +13,7 @@ import (
 	"github.com/NielHeesakkers/frames/internal/db"
 	"github.com/NielHeesakkers/frames/internal/fsops"
 	"github.com/NielHeesakkers/frames/internal/scanner"
+	"github.com/NielHeesakkers/frames/internal/share"
 	"github.com/NielHeesakkers/frames/internal/thumbnail"
 	"github.com/NielHeesakkers/frames/internal/upload"
 )
@@ -98,6 +100,22 @@ func NewRouter(d Deps) http.Handler {
 			sh := &sharesDeps{DB: d.DB, PublicURL: d.PublicURL}
 			r.Get("/admin/shares", sh.handleListAllShares)
 		})
+	})
+
+	// Public share-link surface (unauthenticated, no CSRF).
+	psh := &publicShareDeps{
+		DB:      d.DB,
+		Cache:   d.Cache,
+		Root:    d.Root,
+		Limiter: share.NewRateLimiter(100, time.Minute),
+	}
+	r.Route("/api/s", func(r chi.Router) {
+		r.Post("/{token}/unlock", psh.handleUnlock)
+		r.Get("/{token}", psh.handleMeta)
+		r.Get("/{token}/folder", psh.handleListFolder)
+		r.Get("/{token}/thumb/{id}", psh.handleFileMedia("thumb"))
+		r.Get("/{token}/preview/{id}", psh.handleFileMedia("preview"))
+		r.Get("/{token}/original/{id}", psh.handleFileMedia("original"))
 	})
 
 	return r
