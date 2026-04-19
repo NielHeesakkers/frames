@@ -3,7 +3,6 @@ package api
 
 import (
 	"encoding/json"
-	"errors"
 	"net"
 	"net/http"
 	"time"
@@ -99,4 +98,3 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-var _ = errors.New // silence unused-import warnings in future edits
