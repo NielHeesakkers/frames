@@ -4,16 +4,20 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/NielHeesakkers/frames/internal/auth"
 	"github.com/NielHeesakkers/frames/internal/db"
+	"github.com/NielHeesakkers/frames/internal/thumbnail"
 )
 
 type adminDeps struct {
-	DB *db.DB
+	DB    *db.DB
+	Cache *thumbnail.Cache
 }
 
 type createUserReq struct {
@@ -124,5 +128,67 @@ func (ad *adminDeps) handleChangePassword(w http.ResponseWriter, r *http.Request
 		WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleClearCache removes all generated thumbnails and previews from disk
+// and resets the per-file cache status so the worker regenerates them on
+// the next scan. Does not touch the folder/file index.
+func (ad *adminDeps) handleClearCache(w http.ResponseWriter, r *http.Request) {
+	removed := 0
+	for _, sub := range []string{"thumb", "preview", "tmp"} {
+		dir := filepath.Join(ad.Cache.Root, sub)
+		if entries, err := os.ReadDir(dir); err == nil {
+			for _, e := range entries {
+				p := filepath.Join(dir, e.Name())
+				if err := os.RemoveAll(p); err == nil {
+					removed++
+				}
+			}
+		}
+	}
+	// Reset DB status so the worker regenerates.
+	if _, err := ad.DB.Exec(
+		`UPDATE files SET thumb_status='pending', thumb_attempts=0,
+		                  preview_status='pending', preview_attempts=0`); err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{"removed_entries": removed},
+	})
+}
+
+// handleResetIndex wipes the folder/file index, cache files, and scan history
+// so the next full scan rebuilds everything from scratch. Use after changing
+// the photos root mount. Users, sessions, and account settings are kept.
+func (ad *adminDeps) handleResetIndex(w http.ResponseWriter, r *http.Request) {
+	// 1. Wipe derivatives on disk.
+	for _, sub := range []string{"thumb", "preview", "tmp"} {
+		dir := filepath.Join(ad.Cache.Root, sub)
+		if entries, err := os.ReadDir(dir); err == nil {
+			for _, e := range entries {
+				_ = os.RemoveAll(filepath.Join(dir, e.Name()))
+			}
+		}
+	}
+	// 2. Wipe DB rows that reference filesystem state. Order matters — children
+	// before parents so foreign keys stay consistent (cascades handle most, but
+	// we're explicit here for clarity).
+	stmts := []string{
+		`DELETE FROM shares`,
+		`DELETE FROM folder_shares`,
+		`DELETE FROM files`,
+		`DELETE FROM folders`,
+		`DELETE FROM scan_jobs`,
+	}
+	for _, s := range stmts {
+		if _, err := ad.DB.Exec(s); err != nil {
+			WriteError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+	// 3. VACUUM to reclaim disk space after the big delete.
+	_, _ = ad.DB.Exec(`VACUUM`)
 	w.WriteHeader(http.StatusNoContent)
 }

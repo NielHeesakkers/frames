@@ -112,11 +112,13 @@ func NewRouter(d Deps) http.Handler {
 			sh := &sharesDeps{DB: d.DB, PublicURL: d.PublicURL}
 			r.Get("/admin/shares", sh.handleListAllShares)
 
-			ad := &adminDeps{DB: d.DB}
+			ad := &adminDeps{DB: d.DB, Cache: d.Cache}
 			r.Post("/admin/users", ad.handleCreateUser)
 			r.Get("/admin/users", ad.handleListUsers)
 			r.Delete("/admin/users/{id}", ad.handleDeleteUser)
 			r.Get("/admin/scan_status", ad.handleScanStatus)
+			r.Post("/admin/cache/clear", ad.handleClearCache)
+			r.Post("/admin/index/reset", ad.handleResetIndex)
 		})
 	})
 

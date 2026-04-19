@@ -31,6 +31,28 @@
     setTimeout(() => (scanMsg = ''), 4000);
   }
 
+  let maintMsg = '';
+  async function clearCache() {
+    if (!confirm('Alle thumbnails en previews wissen? De scanner regenereert ze bij de volgende scan.')) return;
+    maintMsg = 'Cache wissen…';
+    try {
+      const r = await api.clearCache();
+      maintMsg = `Cache gewist (${r.removed_entries} entries). Start straks een full scan om alles opnieuw te genereren.`;
+    } catch (e: any) {
+      maintMsg = `Mislukt: ${e.message ?? e}`;
+    }
+  }
+  async function resetIndex() {
+    if (!confirm('ALLE mappen, bestanden, shares en cache wissen? Gebruik dit alleen als je de photos root-map hebt gewijzigd. Users en instellingen blijven bestaan.')) return;
+    maintMsg = 'Reset bezig…';
+    try {
+      await api.resetIndex();
+      maintMsg = 'Library gereset. Klik nu op "Run full scan" om opnieuw te indexeren.';
+    } catch (e: any) {
+      maintMsg = `Mislukt: ${e.message ?? e}`;
+    }
+  }
+
   onMount(async () => {
     let u = $me;
     if (!u) u = await refreshMe();
@@ -79,6 +101,21 @@
       </div>
     </div>
     {#if scanMsg}<p class="ok">{scanMsg}</p>{/if}
+  </section>
+
+  <section>
+    <h3>Onderhoud</h3>
+    <div class="scan">
+      <div class="scan-item">
+        <p class="explain">Verwijdert alle gegenereerde thumbnails en previews. De mappen-index blijft intact; bij de volgende scan worden de thumbs opnieuw gemaakt.</p>
+        <button on:click={clearCache}>Clear cache</button>
+      </div>
+      <div class="scan-item">
+        <p class="explain">Wist mappen, bestanden, shares en cache volledig. Gebruik dit alleen als je de <code>/photos</code> root van de container wijzigt en opnieuw wil indexeren. Users en wachtwoord blijven bestaan.</p>
+        <button class="danger" on:click={resetIndex}>Reset library</button>
+      </div>
+    </div>
+    {#if maintMsg}<p class="ok">{maintMsg}</p>{/if}
   </section>
 </div>
 

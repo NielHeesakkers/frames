@@ -87,6 +87,8 @@ export const api = {
     req<{ id: number }>('POST', '/api/admin/users', u),
   deleteUser: (id: number) => req<void>('DELETE', `/api/admin/users/${id}`),
   scanStatus: () => req<any>('GET', '/api/admin/scan_status'),
+  clearCache: () => req<{ removed_entries: number }>('POST', '/api/admin/cache/clear'),
+  resetIndex: () => req<void>('POST', '/api/admin/index/reset'),
 
   changePassword: (old: string, neo: string) =>
     req<void>('POST', '/api/account/password', { old, new: neo }),

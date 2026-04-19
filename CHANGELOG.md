@@ -2,6 +2,17 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.19.0 — 2026-04-19
+
+- New admin "Onderhoud" section with two maintenance actions:
+  - **Clear cache** — wipes the thumbnail/preview directories and flips
+    every file back to `thumb_status='pending'`. Worker regenerates on
+    the next scan.
+  - **Reset library** — full wipe: cache plus the entire folder/file/
+    scan-job/shares index. Use after changing the container's photos
+    root mount, then click "Run full scan" to re-index. Users and
+    settings are kept.
+
 ## 0.18.0 — 2026-04-19
 
 - Share dialog: "Copy link" now copies AND closes the dialog in one
