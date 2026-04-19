@@ -15,7 +15,7 @@ const (
 	ThumbSize     = 256
 	PreviewSize   = 2048
 	ThumbQuality  = 75
-	PreviewQualty = 85
+	PreviewQuality = 85
 	MaxAttempts   = 3
 )
 
@@ -157,12 +157,12 @@ func (p *Pool) GeneratePreview(ctx context.Context, id int64) error {
 	dst := p.Cache.PreviewPath(id)
 	switch f.Kind {
 	case "image":
-		err = GenerateImageThumb(ctx, src, dst, PreviewSize, PreviewQualty)
+		err = GenerateImageThumb(ctx, src, dst, PreviewSize, PreviewQuality)
 	case "raw":
-		err = GenerateRawPreview(ctx, src, dst, PreviewSize, PreviewQualty)
+		err = GenerateRawPreview(ctx, src, dst, PreviewSize, PreviewQuality)
 	case "video":
 		// Use larger frame.
-		err = GenerateVideoThumb(ctx, src, dst, PreviewSize, PreviewQualty)
+		err = GenerateVideoThumb(ctx, src, dst, PreviewSize, PreviewQuality)
 	default:
 		return nil
 	}
