@@ -25,9 +25,7 @@
       <FolderTree />
       <div class="sidebar-footer">
         <div class="nav-links">
-          <a href="/shares">Shares</a>
-          <a href="/settings">Settings</a>
-          {#if $me?.is_admin}<a href="/admin">Admin</a>{/if}
+          <a href="/settings">⚙ Settings</a>
         </div>
         <div class="account">
           <span>{$me.username}</span>

@@ -18,6 +18,37 @@
     }
   }
 
+  // Slideshow state.
+  let playing = false;
+  let playInterval = 4;  // seconds
+  let playTimer: any = null;
+
+  function stopPlay() {
+    playing = false;
+    if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+  }
+  function scheduleStep() {
+    if (playTimer) clearTimeout(playTimer);
+    playTimer = setTimeout(() => {
+      if (hasNext) {
+        next();
+      } else {
+        stopPlay();
+      }
+    }, playInterval * 1000);
+  }
+  function togglePlay() {
+    if (playing) { stopPlay(); return; }
+    if (!hasNext) return;
+    playing = true;
+    scheduleStep();
+  }
+  // Re-schedule whenever the file changes while playing.
+  $: if (playing && file) scheduleStep();
+
+  // Shortcut overlay.
+  let showHelp = false;
+
   // Recompute index reactively so navigation + re-renders stay in sync.
   $: index = neighbors.indexOf(file.id);
   $: hasPrev = index > 0;
@@ -36,12 +67,17 @@
   function next() { if (hasNext) goto(`/file/${neighbors[index + 1]}`); }
 
   function onKey(e: KeyboardEvent) {
-    if (e.key === 'Escape') close();
+    if (e.key === 'Escape') {
+      if (showHelp) showHelp = false;
+      else close();
+    }
     else if (e.key === 'ArrowLeft') prev();
     else if (e.key === 'ArrowRight') next();
     else if (e.key === '+' || e.key === '=') setZoom(zoom * 1.25);
     else if (e.key === '-' || e.key === '_') setZoom(zoom / 1.25);
     else if (e.key === '0') resetZoom();
+    else if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+    else if (e.key === '?') showHelp = !showHelp;
   }
   onMount(() => window.addEventListener('keydown', onKey));
   onDestroy(() => window.removeEventListener('keydown', onKey));
@@ -118,6 +154,18 @@
 <svelte:window on:mousemove={onMouseMove} on:mouseup={onMouseUp} />
 
 <div class="lightbox">
+  <div class="topbar">
+    <button class="iconbtn" on:click={togglePlay} title={playing ? 'Pauze (spatie)' : 'Slideshow (spatie)'}>
+      {playing ? '⏸' : '▶'}
+    </button>
+    <select bind:value={playInterval} class="interval" title="Slideshow-interval">
+      <option value={2}>2 s</option>
+      <option value={4}>4 s</option>
+      <option value={7}>7 s</option>
+      <option value={10}>10 s</option>
+    </select>
+    <button class="iconbtn" on:click={() => (showHelp = !showHelp)} title="Sneltoetsen (?)">?</button>
+  </div>
   <button class="close" on:click={close} title="Sluiten (Esc)">✕</button>
 
   <button class="nav left" on:click={prev} disabled={!hasPrev} title="Vorige (←)">‹</button>
@@ -226,6 +274,26 @@
       {/each}
     </div>
   {/if}
+
+  {#if showHelp}
+    <div class="help-backdrop" on:click={() => (showHelp = false)}>
+      <div class="help" on:click|stopPropagation>
+        <h3>Sneltoetsen</h3>
+        <dl>
+          <dt>← →</dt><dd>Vorige / volgende foto</dd>
+          <dt>Esc</dt><dd>Sluiten</dd>
+          <dt>Space</dt><dd>Slideshow play / pauze</dd>
+          <dt>+ / −</dt><dd>Zoom in / uit</dd>
+          <dt>0</dt><dd>Zoom reset</dd>
+          <dt>1 … 5</dt><dd>Rating (met muis op thumb)</dd>
+          <dt>?</dt><dd>Dit overzicht</dd>
+        </dl>
+        <div class="help-actions">
+          <button class="primary" on:click={() => (showHelp = false)}>Sluiten</button>
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -241,6 +309,27 @@
     color: #fff; font-size: 16px; cursor: pointer;
     display: grid; place-items: center; }
   .close:hover { background: rgba(255,255,255,0.16); }
+
+  .topbar { position: absolute; top: 12px; left: 80px; z-index: 110;
+    display: flex; gap: 8px; align-items: center; }
+  .iconbtn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    color: #fff; border-radius: 50%; width: 36px; height: 36px;
+    display: grid; place-items: center; cursor: pointer; font-size: 14px; }
+  .iconbtn:hover { background: rgba(255,255,255,0.16); }
+  .interval { background: rgba(255,255,255,0.08); color: #fff;
+    border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;
+    padding: 6px 8px; font-size: 12px; }
+
+  .help-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.7);
+    z-index: 120; display: grid; place-items: center; }
+  .help { background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 24px 28px; min-width: 320px; max-width: 440px; }
+  .help h3 { margin: 0 0 14px; }
+  .help dl { display: grid; grid-template-columns: 90px 1fr; gap: 8px 14px; margin: 0; }
+  .help dt { color: var(--fg-dim); font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px; }
+  .help dd { margin: 0; font-size: 13px; }
+  .help-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
 
   .nav { background: transparent; color: #fff; border: none; font-size: 48px;
     cursor: pointer; grid-row: 1; display: grid; place-items: center;

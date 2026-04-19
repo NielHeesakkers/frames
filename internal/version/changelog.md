@@ -2,6 +2,23 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.25.0 — 2026-04-19
+
+- Sidebar footer simplified to a single **Settings** link. The Settings,
+  Admin and Shares pages now share a top tab bar (via a `(settings)`
+  route group) so switching between them is one click. Admin tab shows
+  only for admins.
+- **Admin stats**: new `Statistieken` block on the admin page with total
+  files, folders, rated, per-kind counts, photo volume and cache size,
+  last scan info. Backend `/api/admin/stats` returns the numbers.
+- **Lightbox slideshow**: play/pause toggle + interval select (2/4/7/10 s)
+  in the top bar. Space key toggles. Auto-stops at the last photo.
+- **Keyboard shortcuts overlay**: `?` in the lightbox shows a cheatsheet.
+- **Justified rows layout** when thumbs are in "Oorspronkelijke
+  verhouding" mode — each row is scaled to fill the container width
+  exactly (Google Photos style), while preserving each photo's aspect
+  ratio. Trailing rows are not up-stretched.
+
 ## 0.24.0 — 2026-04-19
 
 - Hover on a grid thumbnail shows an overlay with filename, resolution,

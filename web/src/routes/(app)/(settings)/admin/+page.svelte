@@ -9,9 +9,20 @@
   let newUser = { username: '', password: '', is_admin: false };
   let error = '';
   let scanMsg = '';
+  let stats: any = null;
 
   async function load() {
     users = await api.listUsers();
+    try { stats = await api.adminStats(); } catch {}
+  }
+
+  function fmtBytes(n: number): string {
+    if (!n) return '0 B';
+    if (n < 1024) return `${n} B`;
+    if (n < 1024*1024) return `${(n/1024).toFixed(1)} KB`;
+    if (n < 1024*1024*1024) return `${(n/1024/1024).toFixed(1)} MB`;
+    if (n < 1024*1024*1024*1024) return `${(n/1024/1024/1024).toFixed(2)} GB`;
+    return `${(n/1024/1024/1024/1024).toFixed(2)} TB`;
   }
   async function add() {
     error = '';
@@ -64,6 +75,30 @@
 
 <div class="page">
   <h2>Admin</h2>
+
+  {#if stats}
+    <section>
+      <h3>Statistieken</h3>
+      <div class="stat-grid">
+        <div class="stat"><div class="num">{stats.files.toLocaleString()}</div><div class="lbl">Bestanden</div></div>
+        <div class="stat"><div class="num">{stats.folders.toLocaleString()}</div><div class="lbl">Mappen</div></div>
+        <div class="stat"><div class="num">{stats.rated.toLocaleString()}</div><div class="lbl">Met rating</div></div>
+        <div class="stat"><div class="num">{fmtBytes(stats.photos_size)}</div><div class="lbl">Foto-volume</div></div>
+        <div class="stat"><div class="num">{fmtBytes(stats.cache_size)}</div><div class="lbl">Cache op disk</div></div>
+      </div>
+      {#if stats.kind_counts}
+        <div class="kind-row">
+          {#each Object.entries(stats.kind_counts) as [kind, count]}
+            <span class="pill"><strong>{kind}</strong> · {count.toLocaleString()}</span>
+          {/each}
+        </div>
+      {/if}
+      {#if stats.last_full?.FinishedAt}
+        <p class="muted">Laatste full scan: {new Date(stats.last_full.FinishedAt).toLocaleString('nl-NL')}
+          ({stats.last_full.FilesScanned.toLocaleString()} gescand)</p>
+      {/if}
+    </section>
+  {/if}
 
   <section>
     <h3>Users</h3>
@@ -134,6 +169,18 @@
     gap: 10px; }
   .explain { margin: 0; color: var(--fg-dim); font-size: 13px; line-height: 1.5; }
   .scan-item button { align-self: flex-start; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px; margin: 12px 0 10px; }
+  .stat { background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px; }
+  .stat .num { font-size: 22px; font-weight: 600; color: var(--fg); }
+  .stat .lbl { font-size: 12px; color: var(--fg-dim); text-transform: uppercase;
+    letter-spacing: 0.3px; margin-top: 4px; }
+  .kind-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; }
+  .pill { background: var(--bg-2); border: 1px solid var(--border);
+    padding: 3px 10px; border-radius: 12px; font-size: 12px; color: var(--fg-dim); }
+  .pill strong { color: var(--fg); margin-right: 4px; }
+  .muted { color: var(--fg-dim); font-size: 12px; }
   @media (max-width: 720px) {
     .scan { grid-template-columns: 1fr; }
   }

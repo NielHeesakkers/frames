@@ -3,6 +3,7 @@ package api
 
 import (
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -129,6 +130,71 @@ func (ad *adminDeps) handleChangePassword(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleStats returns library counts + cache usage. Lightweight overview for admin.
+func (ad *adminDeps) handleStats(w http.ResponseWriter, r *http.Request) {
+	var totalFiles, totalFolders, rated, sumSize int64
+	_ = ad.DB.QueryRow(`SELECT COUNT(*) FROM files`).Scan(&totalFiles)
+	_ = ad.DB.QueryRow(`SELECT COUNT(*) FROM folders`).Scan(&totalFolders)
+	_ = ad.DB.QueryRow(`SELECT COUNT(*) FROM files WHERE rating > 0`).Scan(&rated)
+	_ = ad.DB.QueryRow(`SELECT COALESCE(SUM(size), 0) FROM files`).Scan(&sumSize)
+
+	kindCounts := map[string]int64{}
+	if rows, err := ad.DB.Query(`SELECT kind, COUNT(*) FROM files GROUP BY kind`); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var k string
+			var c int64
+			if err := rows.Scan(&k, &c); err == nil {
+				kindCounts[k] = c
+			}
+		}
+	}
+	ratingDist := map[int]int64{}
+	if rows, err := ad.DB.Query(`SELECT rating, COUNT(*) FROM files WHERE rating > 0 GROUP BY rating`); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var r int
+			var c int64
+			if err := rows.Scan(&r, &c); err == nil {
+				ratingDist[r] = c
+			}
+		}
+	}
+
+	lastInc, _ := ad.DB.LastScanJob("incremental")
+	lastFull, _ := ad.DB.LastScanJob("full")
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"files":            totalFiles,
+			"folders":          totalFolders,
+			"rated":            rated,
+			"kind_counts":      kindCounts,
+			"rating_dist":      ratingDist,
+			"photos_size":      sumSize,
+			"cache_size":       dirSize(ad.Cache.Root),
+			"last_incremental": lastInc,
+			"last_full":        lastFull,
+		},
+	})
+}
+
+func dirSize(root string) int64 {
+	var total int64
+	filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		total += info.Size()
+		return nil
+	})
+	return total
 }
 
 // handleClearCache removes all generated thumbnails and previews from disk

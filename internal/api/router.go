@@ -120,6 +120,7 @@ func NewRouter(d Deps) http.Handler {
 			r.Get("/admin/scan_status", ad.handleScanStatus)
 			r.Post("/admin/cache/clear", ad.handleClearCache)
 			r.Post("/admin/index/reset", ad.handleResetIndex)
+			r.Get("/admin/stats", ad.handleStats)
 		})
 	})
 
