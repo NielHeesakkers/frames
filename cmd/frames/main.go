@@ -68,6 +68,21 @@ func run() error {
 	sched.Start(ctx)
 	defer sched.Stop()
 
+	go func() {
+		t := time.NewTicker(1 * time.Hour)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				if n, err := database.CleanupExpiredSessions(); err == nil && n > 0 {
+					log.Info("cleaned expired sessions", "count", n)
+				}
+			}
+		}
+	}()
+
 	cache := &thumbnail.Cache{Root: cfg.CacheDir}
 	if err := cache.Ensure(); err != nil {
 		return err
