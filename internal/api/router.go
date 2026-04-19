@@ -19,19 +19,20 @@ import (
 )
 
 type Deps struct {
-	Log       *slog.Logger
-	DB        *db.DB
-	Limiter   *auth.LoginLimiter
-	Scheduler *scanner.Scheduler
-	Cache     *thumbnail.Cache
-	Queue     *thumbnail.Queue
-	Pool      *thumbnail.Pool
-	Ops       *fsops.Ops
-	UploadSvc *upload.Service
-	MaxUpload int64
-	Root      string
-	Secure    bool
-	PublicURL string
+	Log            *slog.Logger
+	DB             *db.DB
+	Limiter        *auth.LoginLimiter
+	Scheduler      *scanner.Scheduler
+	Cache          *thumbnail.Cache
+	Queue          *thumbnail.Queue
+	Pool           *thumbnail.Pool
+	Ops            *fsops.Ops
+	UploadSvc      *upload.Service
+	MaxUpload      int64
+	ShareUploadMax int64
+	Root           string
+	Secure         bool
+	PublicURL      string
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -104,10 +105,13 @@ func NewRouter(d Deps) http.Handler {
 
 	// Public share-link surface (unauthenticated, no CSRF).
 	psh := &publicShareDeps{
-		DB:      d.DB,
-		Cache:   d.Cache,
-		Root:    d.Root,
-		Limiter: share.NewRateLimiter(100, time.Minute),
+		DB:       d.DB,
+		Cache:    d.Cache,
+		Root:     d.Root,
+		Limiter:  share.NewRateLimiter(100, time.Minute),
+		Upload:   d.UploadSvc,
+		Queue:    d.Queue,
+		MaxBytes: d.ShareUploadMax,
 	}
 	r.Route("/api/s", func(r chi.Router) {
 		r.Post("/{token}/unlock", psh.handleUnlock)
@@ -117,6 +121,7 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/{token}/preview/{id}", psh.handleFileMedia("preview"))
 		r.Get("/{token}/original/{id}", psh.handleFileMedia("original"))
 		r.Get("/{token}/zip", psh.handleZip)
+		r.Post("/{token}/upload", psh.handleAnonymousUpload)
 	})
 
 	return r

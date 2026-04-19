@@ -4,14 +4,20 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/NielHeesakkers/frames/internal/auth"
 	"github.com/NielHeesakkers/frames/internal/db"
+	"github.com/NielHeesakkers/frames/internal/scanner"
 	"github.com/NielHeesakkers/frames/internal/share"
+	"github.com/NielHeesakkers/frames/internal/thumbnail"
+	"github.com/NielHeesakkers/frames/internal/upload"
 )
 
 // Public share access is NOT wrapped in RequireLogin or CSRF (it's an unauthenticated
@@ -19,10 +25,13 @@ import (
 // cookie, and scope.
 
 type publicShareDeps struct {
-	DB      *db.DB
-	Cache   thumbnailCache // interface to avoid import cycle
-	Root    string
-	Limiter *share.RateLimiter
+	DB       *db.DB
+	Cache    thumbnailCache // interface to avoid import cycle
+	Root     string
+	Limiter  *share.RateLimiter
+	Upload   *upload.Service
+	Queue    *thumbnail.Queue
+	MaxBytes int64
 }
 
 // thumbnailCache is a minimal interface matching *thumbnail.Cache.
@@ -234,4 +243,104 @@ func (psh *publicShareDeps) handleZip(w http.ResponseWriter, r *http.Request) {
 		// Can't change status at this point; just log.
 		_ = err
 	}
+}
+
+func (psh *publicShareDeps) handleAnonymousUpload(w http.ResponseWriter, r *http.Request) {
+	s, code := psh.load(r)
+	if code != 0 {
+		WriteError(w, code, http.StatusText(code))
+		return
+	}
+	if !s.AllowUpload {
+		WriteError(w, http.StatusForbidden, "upload disabled")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, psh.MaxBytes)
+	if err := r.ParseMultipartForm(64 << 20); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid multipart")
+		return
+	}
+	uploader := r.FormValue("name")
+	if uploader == "" {
+		uploader = "anonymous"
+	}
+	folder, _ := psh.DB.FolderByID(s.FolderID)
+	targetFolder := filepath.Join(folder.Path, "Uploads", sanitizeName(uploader))
+	// Ensure the target folder on disk + DB.
+	if err := psh.ensureFolder(targetFolder); err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	files := r.MultipartForm.File["files"]
+	if len(files) == 0 {
+		WriteError(w, http.StatusBadRequest, "no files")
+		return
+	}
+	ids := make([]int64, 0, len(files))
+	for _, fh := range files {
+		f, err := fh.Open()
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		id, err := psh.Upload.StoreFile(targetFolder, sanitizeName(fh.Filename), f, scanner.Classify)
+		f.Close()
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		psh.Queue.Push(id, thumbnail.PrioForeground)
+		ids = append(ids, id)
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"ids": ids}})
+}
+
+func (psh *publicShareDeps) ensureFolder(rel string) error {
+	abs, err := upload.SafeJoin(psh.Root, rel)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(abs, 0o755); err != nil {
+		return err
+	}
+	// Walk up ensuring rows exist.
+	parts := strings.Split(rel, "/")
+	cur := ""
+	var parentID *int64
+	for _, p := range parts {
+		if p == "" {
+			continue
+		}
+		if cur != "" {
+			cur = cur + "/" + p
+		} else {
+			cur = p
+		}
+		existing, err := psh.DB.FolderByPath(cur)
+		if err == nil {
+			parentID = &existing.ID
+			continue
+		}
+		if err != db.ErrNotFound {
+			return err
+		}
+		fi, _ := os.Stat(filepath.Join(psh.Root, cur))
+		var mtime int64
+		if fi != nil {
+			mtime = fi.ModTime().Unix()
+		}
+		created, err := psh.DB.UpsertFolder(db.Folder{
+			ParentID: parentID, Path: cur, Name: p, Mtime: mtime,
+		})
+		if err != nil {
+			return err
+		}
+		parentID = &created.ID
+	}
+	return nil
+}
+
+func sanitizeName(s string) string {
+	replacer := strings.NewReplacer("/", "_", "\\", "_", "..", "_", "\x00", "_")
+	return replacer.Replace(s)
 }

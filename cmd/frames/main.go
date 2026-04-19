@@ -86,9 +86,11 @@ func run() error {
 	h := api.NewRouter(api.Deps{
 		Log: log, DB: database, Limiter: lim, Scheduler: sched,
 		Cache: cache, Queue: q, Pool: pool, Ops: ops, Root: cfg.PhotosRoot,
-		UploadSvc: uploadSvc, MaxUpload: cfg.MaxUploadSize,
-		Secure:    strings.HasPrefix(cfg.PublicURL, "https://"),
-		PublicURL: cfg.PublicURL,
+		UploadSvc:      uploadSvc,
+		MaxUpload:      cfg.MaxUploadSize,
+		ShareUploadMax: cfg.ShareUploadMax,
+		Secure:         strings.HasPrefix(cfg.PublicURL, "https://"),
+		PublicURL:      cfg.PublicURL,
 	})
 	srv := &http.Server{
 		Addr:              cfg.Bind,
