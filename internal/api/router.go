@@ -54,6 +54,10 @@ func NewRouter(d Deps) http.Handler {
 			r.Get("/thumb/{id}", mdx.handleThumb)
 			r.Get("/preview/{id}", mdx.handlePreview)
 			r.Get("/original/{id}", mdx.handleOriginal)
+
+			bd := &browseDeps{DB: d.DB}
+			r.Get("/folder", bd.handleFolder)
+			r.Get("/folder/*", bd.handleFolder)
 		})
 	})
 
