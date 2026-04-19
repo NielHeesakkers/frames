@@ -11,6 +11,7 @@ import (
 
 	"github.com/NielHeesakkers/frames/internal/auth"
 	"github.com/NielHeesakkers/frames/internal/db"
+	"github.com/NielHeesakkers/frames/internal/frontend"
 	"github.com/NielHeesakkers/frames/internal/fsops"
 	"github.com/NielHeesakkers/frames/internal/scanner"
 	"github.com/NielHeesakkers/frames/internal/share"
@@ -132,6 +133,8 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/{token}/zip", psh.handleZip)
 		r.Post("/{token}/upload", psh.handleAnonymousUpload)
 	})
+
+	r.NotFound(frontend.Handler().ServeHTTP)
 
 	return r
 }
