@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Iteration for backend (Go) changes.
-# Rsyncs source to the Mac Mini, rebuilds the Docker image there, and
-# force-recreates the frames container with the fresh image while preserving
-# the mounts + env of whatever Portainer stack config you deployed.
+# Rsyncs source to the Mac Mini, rebuilds the Docker image there, then
+# force-recreates the frames container with the fresh image so migrations
+# and new code actually take effect.
 # Total: ~90 seconds.
 set -euo pipefail
 
@@ -34,35 +34,27 @@ sed -i '' 's|^# syntax=docker/dockerfile:.*||' Dockerfile
 time DOCKER_BUILDKIT=0 docker build -t ghcr.io/nielheesakkers/frames:latest -t frames:dev . 2>&1 | tail -4
 "
 
-# Force-recreate the frames container with the fresh image. We dump the
-# existing container's run config to JSON, rewrite it with `docker run`-
-# compatible flags via `jq`, stop the old container, and run the new one.
+# Force-recreate the frames container. Config below mirrors the Portainer
+# stack (NAS-mounted photos, cache/data/frontend bind mounts, env vars).
+# If you change the Portainer compose (different volume name, different
+# NAS host, etc.), update these values too.
 echo "=== force-recreate container ==="
 ssh "$REMOTE_HOST" '
 export PATH=/usr/local/bin:$PATH
-if ! docker ps -a --filter name=^frames$ --format "{{.Names}}" | grep -q frames; then
-  echo "No frames container present — deploy your Portainer stack first."
-  exit 0
-fi
-
-# Extract config one field at a time via --format Go templates (no jq needed).
-binds=$(docker inspect frames --format "{{range .HostConfig.Binds}}{{println .}}{{end}}")
-vols=$(docker inspect frames --format "{{range .Mounts}}{{if eq .Type \"volume\"}}{{println .Name \":\" .Destination}}{{end}}{{end}}" | tr -d " ")
-envs=$(docker inspect frames --format "{{range .Config.Env}}{{println .}}{{end}}")
-ports=$(docker inspect frames --format "{{range \$cp, \$hps := .HostConfig.PortBindings}}{{range \$hps}}{{println .HostPort \":\" $cp}}{{end}}{{end}}" | sed "s/ //g; s|/[a-z]*||g")
-
-docker stop frames >/dev/null
-docker rm frames >/dev/null
-
-run_args=(run -d --name frames --restart unless-stopped)
-while IFS= read -r b; do [ -n "$b" ] && run_args+=("-v" "$b"); done <<< "$binds"
-while IFS= read -r v; do [ -n "$v" ] && run_args+=("-v" "$v"); done <<< "$vols"
-while IFS= read -r p; do [ -n "$p" ] && run_args+=("-p" "$p"); done <<< "$ports"
-# Env is one name=value per line — easy because container env doesn'\''t contain newlines.
-while IFS= read -r e; do [ -n "$e" ] && run_args+=("-e" "$e"); done <<< "$envs"
-run_args+=(ghcr.io/nielheesakkers/frames:latest)
-
-docker "${run_args[@]}" >/dev/null
+docker rm -f frames >/dev/null 2>&1 || true
+docker run -d --name frames --restart unless-stopped \
+  -p 2342:8080 \
+  -v frames_photos_nas:/photos:rw \
+  -v /Users/server/Docker/Frames/Cache:/cache \
+  -v /Users/server/Docker/Frames/Data:/data \
+  -v /Users/server/Docker/Frames/Frontend:/frontend:ro \
+  -e FRAMES_SESSION_SECRET="hfbeu*WE#YRhv8d0hvvbosdfb" \
+  -e FRAMES_PUBLIC_URL="https://frames.heesakkers.com" \
+  -e FRAMES_ADMIN_USERNAME="niel" \
+  -e FRAMES_ADMIN_PASSWORD="Puno@4074" \
+  -e FRAMES_TRUST_PROXY="1" \
+  -e FRAMES_FRONTEND_DIR="/frontend" \
+  ghcr.io/nielheesakkers/frames:latest >/dev/null
 sleep 2
 docker ps --filter name=^frames$ --format "table {{.Status}}"
 '
