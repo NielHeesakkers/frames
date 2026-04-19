@@ -1,10 +1,13 @@
 <!-- web/src/lib/components/GridItem.svelte -->
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { createEventDispatcher } from 'svelte';
   import { selection } from '$lib/stores';
 
   export let file: any;
   export let size = 160;
+
+  const dispatch = createEventDispatcher<{ context: { file: any; x: number; y: number } }>();
 
   function onClick(e: MouseEvent) {
     if (e.shiftKey || e.metaKey || e.ctrlKey) {
@@ -17,9 +20,14 @@
     }
     goto(`/file/${file.id}`);
   }
+
+  function onContext(e: MouseEvent) {
+    e.preventDefault();
+    dispatch('context', { file, x: e.clientX, y: e.clientY });
+  }
 </script>
 
-<div class="item" style="--size: {size}px" on:click={onClick}
+<div class="item" style="--size: {size}px" on:click={onClick} on:contextmenu={onContext}
      class:selected={$selection.has(file.id)}>
   {#if file.kind === 'other'}
     <div class="icon">📄</div>

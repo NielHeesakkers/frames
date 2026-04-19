@@ -10,7 +10,7 @@
 
 <div class="grid" style="--size: {itemSize}px">
   {#each files as f (f.id)}
-    <GridItem file={f} size={itemSize} />
+    <GridItem file={f} size={itemSize} on:context />
   {/each}
 </div>
 

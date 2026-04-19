@@ -12,6 +12,7 @@
   <div class="dialog" on:click|stopPropagation>
     <h3>{title}</h3>
     <p>{message}</p>
+    <slot name="body" />
     <div class="actions">
       <button on:click={onCancel}>Cancel</button>
       <button class:primary={!danger} class:danger on:click={onConfirm}>{confirmLabel}</button>
