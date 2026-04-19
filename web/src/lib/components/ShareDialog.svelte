@@ -3,6 +3,7 @@
   import { api } from '$lib/api';
   export let folderId: number;
   export let folderPath: string;
+  export let fileIds: number[] | null = null;
   export let onClose: () => void;
 
   let expiresDays = 30;
@@ -13,6 +14,8 @@
   let error = '';
   let created: any = null;
 
+  $: isFileShare = fileIds && fileIds.length > 0;
+
   async function create() {
     busy = true; error = '';
     try {
@@ -21,7 +24,8 @@
         expires_in_days: Number(expiresDays) || 0,
         password: password || undefined,
         allow_download: allowDownload,
-        allow_upload: allowUpload
+        allow_upload: allowUpload,
+        file_ids: isFileShare ? fileIds : undefined
       });
     } catch (e: any) {
       error = e.message ?? 'failed';
@@ -54,7 +58,13 @@
 
 <div class="backdrop" on:click={onClose}>
   <div class="dialog" on:click|stopPropagation>
-    <h3>Share "{folderPath || 'root'}"</h3>
+    <h3>
+      {#if isFileShare}
+        Share {fileIds?.length} geselecteerde foto{(fileIds?.length ?? 0) === 1 ? '' : '’s'}
+      {:else}
+        Share "{folderPath || 'root'}"
+      {/if}
+    </h3>
     {#if !created}
       <label>Expires (days, 0 = never)
         <input type="number" min="0" bind:value={expiresDays} /></label>

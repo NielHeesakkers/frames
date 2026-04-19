@@ -3,6 +3,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -18,43 +19,50 @@ type Share struct {
 	AllowDownload bool
 	AllowUpload   bool
 	RevokedAt     *time.Time
+	// FileIDs narrows a share to a specific set of files (by ID). When nil/
+	// empty the share covers the whole folder subtree as before.
+	FileIDs []int64
+}
+
+// encodeFileIDs returns NULL when the slice is empty, otherwise a JSON array.
+func encodeFileIDs(ids []int64) any {
+	if len(ids) == 0 {
+		return nil
+	}
+	b, _ := json.Marshal(ids)
+	return string(b)
 }
 
 func (d *DB) CreateShare(s Share) (int64, error) {
 	res, err := d.Exec(`
-		INSERT INTO shares(token,folder_id,created_by,expires_at,password_hash,allow_download,allow_upload)
-		VALUES(?,?,?,?,?,?,?)
-	`, s.Token, s.FolderID, s.CreatedBy, s.ExpiresAt, s.PasswordHash, s.AllowDownload, s.AllowUpload)
+		INSERT INTO shares(token,folder_id,created_by,expires_at,password_hash,
+		                   allow_download,allow_upload,file_ids)
+		VALUES(?,?,?,?,?,?,?,?)
+	`, s.Token, s.FolderID, s.CreatedBy, s.ExpiresAt, s.PasswordHash,
+		s.AllowDownload, s.AllowUpload, encodeFileIDs(s.FileIDs))
 	if err != nil {
 		return 0, err
 	}
 	return res.LastInsertId()
 }
 
+const shareSelect = `
+SELECT id,token,folder_id,created_by,created_at,expires_at,password_hash,
+       allow_download,allow_upload,revoked_at,file_ids
+FROM shares`
+
 func (d *DB) ShareByToken(token string) (*Share, error) {
-	row := d.QueryRow(`
-		SELECT id,token,folder_id,created_by,created_at,expires_at,password_hash,
-		       allow_download,allow_upload,revoked_at
-		FROM shares WHERE token=?
-	`, token)
+	row := d.QueryRow(shareSelect+` WHERE token=?`, token)
 	return scanShare(row)
 }
 
 func (d *DB) ShareByID(id int64) (*Share, error) {
-	row := d.QueryRow(`
-		SELECT id,token,folder_id,created_by,created_at,expires_at,password_hash,
-		       allow_download,allow_upload,revoked_at
-		FROM shares WHERE id=?
-	`, id)
+	row := d.QueryRow(shareSelect+` WHERE id=?`, id)
 	return scanShare(row)
 }
 
 func (d *DB) SharesByUser(userID int64) ([]Share, error) {
-	rows, err := d.Query(`
-		SELECT id,token,folder_id,created_by,created_at,expires_at,password_hash,
-		       allow_download,allow_upload,revoked_at
-		FROM shares WHERE created_by=? ORDER BY created_at DESC
-	`, userID)
+	rows, err := d.Query(shareSelect+` WHERE created_by=? ORDER BY created_at DESC`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -71,11 +79,7 @@ func (d *DB) SharesByUser(userID int64) ([]Share, error) {
 }
 
 func (d *DB) AllShares() ([]Share, error) {
-	rows, err := d.Query(`
-		SELECT id,token,folder_id,created_by,created_at,expires_at,password_hash,
-		       allow_download,allow_upload,revoked_at
-		FROM shares ORDER BY created_at DESC
-	`)
+	rows, err := d.Query(shareSelect + ` ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -106,8 +110,9 @@ func scanShare(r rowScanner) (*Share, error) {
 	var exp sql.NullTime
 	var pw sql.NullString
 	var rev sql.NullTime
+	var fids sql.NullString
 	err := r.Scan(&s.ID, &s.Token, &s.FolderID, &s.CreatedBy, &s.CreatedAt,
-		&exp, &pw, &s.AllowDownload, &s.AllowUpload, &rev)
+		&exp, &pw, &s.AllowDownload, &s.AllowUpload, &rev, &fids)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -123,6 +128,12 @@ func scanShare(r rowScanner) (*Share, error) {
 	}
 	if rev.Valid {
 		s.RevokedAt = &rev.Time
+	}
+	if fids.Valid && fids.String != "" {
+		var ids []int64
+		if jErr := json.Unmarshal([]byte(fids.String), &ids); jErr == nil {
+			s.FileIDs = ids
+		}
 	}
 	return s, nil
 }

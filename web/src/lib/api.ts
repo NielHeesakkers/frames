@@ -74,7 +74,7 @@ export const api = {
   },
 
   myShares: () => req<any[]>('GET', '/api/shares'),
-  createShare: (body: any) => req<any>('POST', '/api/shares', body),
+  createShare: (body: any) => req<any>('POST', '/api/shares', body as any),
   revokeShare: (id: number) => req<void>('DELETE', `/api/shares/${id}/revoke`),
   deleteShare: (id: number) => req<void>('DELETE', `/api/shares/${id}`),
 

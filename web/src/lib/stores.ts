@@ -26,6 +26,10 @@ export const selection = writable<Set<number>>(new Set());
 export const sortMode = writable<'takenAt' | 'name' | 'size' | 'rating'>('takenAt');
 export const density = writable<'small' | 'medium' | 'large'>('medium');
 
+/** Thumbnail shape in the grid. 'square' = uniform squares (crop via object-fit:cover),
+ *  'original' = preserve each photo's aspect ratio in a justified-rows layout. */
+export const thumbShape = writable<'square' | 'original'>('square');
+
 /**
  * Paths of folders the user has expanded in the sidebar tree. Persisted to
  * localStorage so the tree keeps its shape across reloads.

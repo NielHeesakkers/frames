@@ -4,7 +4,7 @@
      store so the folder-tree highlight stays in sync. -->
 <script lang="ts">
   import { api } from '$lib/api';
-  import { currentFolderPath, sortMode, density } from '$lib/stores';
+  import { currentFolderPath, sortMode, density, thumbShape, selection } from '$lib/stores';
   import Grid from '$lib/components/Grid.svelte';
   import ContextMenu from '$lib/components/ContextMenu.svelte';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -134,9 +134,18 @@
     <select bind:value={$density}>
       <option value="small">S</option><option value="medium">M</option><option value="large">L</option>
     </select>
+    <select bind:value={$thumbShape} title="Thumb shape">
+      <option value="square">Squares</option>
+      <option value="original">Oorspronkelijke verhouding</option>
+    </select>
     <div class="spacer" />
+    {#if $selection.size > 0}
+      <span class="sel-count">{$selection.size} geselecteerd</span>
+      <button on:click={() => selection.set(new Set())}>Deselect</button>
+      <button on:click={() => (sharing = { id: folder?.id ?? 0, path: folder?.path ?? '', fileIds: Array.from($selection) })}>Share selected</button>
+    {/if}
     <button on:click={() => (showNewFolder = true)}>New folder</button>
-    {#if folder}<button on:click={() => (sharing = { id: folder.id, path: folder.path })}>Share</button>{/if}
+    {#if folder}<button on:click={() => (sharing = { id: folder.id, path: folder.path })}>Share folder</button>{/if}
     <button class="primary" on:click={() => (uploading = true)}>+ Upload</button>
   </div>
 
@@ -234,7 +243,9 @@
 {/if}
 
 {#if sharing}
-  <ShareDialog folderId={sharing.id} folderPath={sharing.path} onClose={() => (sharing = null)} />
+  <ShareDialog folderId={sharing.id} folderPath={sharing.path}
+               fileIds={sharing.fileIds ?? null}
+               onClose={() => (sharing = null)} />
 {/if}
 
 <style>
@@ -260,4 +271,5 @@
   .files-section { display: flex; flex-direction: column; min-height: 0; }
   .empty { padding: 16px; color: var(--fg-dim); font-style: italic; }
   .sub-caption { margin: 0 16px 6px; color: var(--fg-dim); font-size: 12px; font-style: italic; }
+  .sel-count { color: var(--accent); font-size: 13px; margin-right: 4px; }
 </style>

@@ -1,12 +1,11 @@
 <!-- web/src/lib/components/Grid.svelte -->
 <script lang="ts">
   import GridItem from './GridItem.svelte';
-  import { density, sortMode } from '$lib/stores';
+  import { density, sortMode, thumbShape } from '$lib/stores';
 
   export let files: any[] = [];
 
   $: itemSize = $density === 'small' ? 120 : $density === 'large' ? 220 : 160;
-  // Month-grouping only makes sense when sorting by capture date.
   $: groupByMonth = $sortMode === 'takenAt';
 
   type Group = { key: string; label: string; items: any[] };
@@ -16,7 +15,6 @@
     const raw: string | undefined = f.taken_at;
     let d: Date | null = null;
     if (raw) {
-      // taken_at comes back as "YYYY-MM-DDTHH:MM:SS"
       d = new Date(raw.replace(' ', 'T'));
       if (isNaN(d.getTime())) d = null;
     }
@@ -41,13 +39,17 @@
     }
     return out;
   })();
+
+  // For aspect-ratio mode, flex-wrap on a parent with fixed row height gives
+  // a justified-rows layout automatically.
+  $: layoutClass = $thumbShape === 'original' ? 'justified' : 'square';
 </script>
 
 {#if groups}
   <div class="timeline" style="--size: {itemSize}px">
     {#each groups as g (g.key)}
       <h4 class="month">{g.label} <span class="count">· {g.items.length}</span></h4>
-      <div class="grid">
+      <div class={`grid ${layoutClass}`}>
         {#each g.items as f (f.id)}
           <GridItem file={f} size={itemSize} on:context />
         {/each}
@@ -55,7 +57,7 @@
     {/each}
   </div>
 {:else}
-  <div class="grid solo" style="--size: {itemSize}px">
+  <div class={`grid solo ${layoutClass}`} style="--size: {itemSize}px">
     {#each files as f (f.id)}
       <GridItem file={f} size={itemSize} on:context />
     {/each}
@@ -65,10 +67,16 @@
 <style>
   .timeline { display: flex; flex-direction: column; overflow-y: auto; flex: 1;
     content-visibility: auto; padding-bottom: 8px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, var(--size));
+  /* Square grid: uniform cells. */
+  .grid.square { display: grid;
+    grid-template-columns: repeat(auto-fill, var(--size));
     gap: 4px; padding: 0 8px 14px; }
+  /* Justified rows: flex-wrap gives rows of fixed height with natural widths. */
+  .grid.justified { display: flex; flex-wrap: wrap; gap: 4px;
+    padding: 0 8px 14px; }
   .grid.solo { overflow-y: auto; flex: 1; padding: 8px;
     content-visibility: auto; }
+  .grid.solo.square { padding: 8px; }
   .month { position: sticky; top: 0; z-index: 2;
     background: var(--bg); margin: 0; padding: 14px 10px 8px;
     font-size: 13px; font-weight: 600; color: var(--fg);

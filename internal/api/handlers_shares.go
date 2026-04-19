@@ -68,11 +68,12 @@ func (sh *sharesDeps) handleMySharedFolders(w http.ResponseWriter, r *http.Reque
 // ---- External share-link CRUD ----
 
 type createShareReq struct {
-	FolderID      int64  `json:"folder_id"`
-	ExpiresInDays int    `json:"expires_in_days"` // 0 = never; positive => days
-	Password      string `json:"password"`        // optional
-	AllowDownload bool   `json:"allow_download"`
-	AllowUpload   bool   `json:"allow_upload"`
+	FolderID      int64   `json:"folder_id"`
+	ExpiresInDays int     `json:"expires_in_days"` // 0 = never; positive => days
+	Password      string  `json:"password"`        // optional
+	AllowDownload bool    `json:"allow_download"`
+	AllowUpload   bool    `json:"allow_upload"`
+	FileIDs       []int64 `json:"file_ids,omitempty"` // when set: share only these files
 }
 
 type shareDTO struct {
@@ -143,6 +144,7 @@ func (sh *sharesDeps) handleCreateShare(w http.ResponseWriter, r *http.Request) 
 	s := db.Share{
 		Token: tok, FolderID: req.FolderID, CreatedBy: u.ID,
 		AllowDownload: req.AllowDownload, AllowUpload: req.AllowUpload,
+		FileIDs: req.FileIDs,
 	}
 	if req.ExpiresInDays > 0 {
 		e := time.Now().Add(time.Duration(req.ExpiresInDays) * 24 * time.Hour)

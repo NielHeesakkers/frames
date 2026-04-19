@@ -17,7 +17,6 @@ func StreamFolderZip(w io.Writer, d *db.DB, root, rootPath string) error {
 	zw := zip.NewWriter(w)
 	defer zw.Close()
 
-	// Walk files in DB rooted at rootPath.
 	rows, err := d.Query(`
 		SELECT id, relative_path FROM files
 		WHERE relative_path = ? OR relative_path LIKE ?
@@ -34,7 +33,6 @@ func StreamFolderZip(w io.Writer, d *db.DB, root, rootPath string) error {
 			return err
 		}
 		abs := filepath.Join(root, rel)
-		// Strip the rootPath prefix from entry name for nicer ZIP layout.
 		entryName := strings.TrimPrefix(rel, rootPath+"/")
 		if entryName == rel {
 			entryName = filepath.Base(rel)
@@ -44,6 +42,43 @@ func StreamFolderZip(w io.Writer, d *db.DB, root, rootPath string) error {
 		}
 	}
 	return rows.Err()
+}
+
+// StreamFilesZip writes a ZIP with only the named files into w, streaming.
+// Entry names are the basename of each file (no folder hierarchy is preserved
+// because file-scoped shares aren't tied to a single parent).
+func StreamFilesZip(w io.Writer, d *db.DB, root string, ids []int64) error {
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+	seen := make(map[string]int, len(ids))
+	for _, id := range ids {
+		var rel string
+		if err := d.QueryRow(`SELECT relative_path FROM files WHERE id=?`, id).Scan(&rel); err != nil {
+			continue
+		}
+		abs := filepath.Join(root, rel)
+		entryName := filepath.Base(rel)
+		// Avoid duplicate entry names when two selected files share a name
+		// in different folders: append "(n)" to the second, "(2)" to the third, …
+		if n := seen[entryName]; n > 0 {
+			ext := filepath.Ext(entryName)
+			base := strings.TrimSuffix(entryName, ext)
+			entryName = base + " (" + itoa(n+1) + ")" + ext
+		}
+		seen[filepath.Base(rel)]++
+		if err := addFile(zw, abs, entryName); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func itoa(n int) string {
+	// tiny helper to avoid importing strconv just for this
+	if n < 10 {
+		return string(rune('0' + n))
+	}
+	return itoa(n/10) + string(rune('0'+n%10))
 }
 
 func addFile(zw *zip.Writer, abs, entryName string) error {

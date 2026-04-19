@@ -154,8 +154,20 @@ func (psh *publicShareDeps) handleListFolder(w http.ResponseWriter, r *http.Requ
 		}
 		target = cand
 	}
-	children, _ := psh.DB.ChildFolders(target.ID)
-	files, _ := psh.DB.FilesInFolder(target.ID, 500, 0, db.SortByTakenAt)
+	var children []db.Folder
+	var files []db.File
+	if len(s.FileIDs) > 0 {
+		// File-scoped share: no subfolder navigation; only the named files.
+		for _, id := range s.FileIDs {
+			f, err := psh.DB.FileByID(id)
+			if err == nil && f != nil {
+				files = append(files, *f)
+			}
+		}
+	} else {
+		children, _ = psh.DB.ChildFolders(target.ID)
+		files, _ = psh.DB.FilesInFolder(target.ID, 50000, 0, db.SortByTakenAt)
+	}
 
 	foldersOut := make([]map[string]any, 0, len(children))
 	for _, c := range children {
@@ -202,12 +214,28 @@ func (psh *publicShareDeps) handleFileMedia(kind string) http.HandlerFunc {
 			WriteError(w, http.StatusNotFound, "not found")
 			return
 		}
-		// Scope check.
-		rootFolder, _ := psh.DB.FolderByID(s.FolderID)
-		folderOfFile, _ := psh.DB.FolderByID(f.FolderID)
-		if !share.IsUnderFolder(rootFolder.Path, folderOfFile.Path) {
-			WriteError(w, http.StatusForbidden, "out of scope")
-			return
+		// Scope check: when the share is file-scoped, only those explicit
+		// file IDs are reachable; otherwise fall back to "under the folder
+		// subtree".
+		if len(s.FileIDs) > 0 {
+			allowed := false
+			for _, aid := range s.FileIDs {
+				if aid == id {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				WriteError(w, http.StatusForbidden, "out of scope")
+				return
+			}
+		} else {
+			rootFolder, _ := psh.DB.FolderByID(s.FolderID)
+			folderOfFile, _ := psh.DB.FolderByID(f.FolderID)
+			if !share.IsUnderFolder(rootFolder.Path, folderOfFile.Path) {
+				WriteError(w, http.StatusForbidden, "out of scope")
+				return
+			}
 		}
 		switch kind {
 		case "thumb":
@@ -244,6 +272,13 @@ func (psh *publicShareDeps) handleZip(w http.ResponseWriter, r *http.Request) {
 	name := folder.Name
 	if name == "" {
 		name = "frames"
+	}
+	if len(s.FileIDs) > 0 {
+		w.Header().Set("Content-Disposition", `attachment; filename="`+name+`.zip"`)
+		if err := share.StreamFilesZip(w, psh.DB, psh.Root, s.FileIDs); err != nil {
+			psh.Log.Warn("zip stream error", "err", err)
+		}
+		return
 	}
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`.zip"`)
 	if err := share.StreamFolderZip(w, psh.DB, psh.Root, folder.Path); err != nil {

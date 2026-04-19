@@ -2,6 +2,22 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.23.0 — 2026-04-19
+
+- **Thumbnail shape toggle** in the toolbar: "Squares" (uniform crop,
+  default) or "Oorspronkelijke verhouding" (justified rows preserving
+  each photo's aspect ratio).
+- **Video hover preview**: hovering a video thumbnail plays the original
+  muted + looped, replacing the still-frame thumb in place.
+- **FTS5 full-text search** over filename + relative_path. Migration
+  `0003_fts5.sql` creates the virtual table with triggers to stay in
+  sync. Search now uses prefix-MATCH (`berl*` matches `berlin`).
+- **Multi-file shares**: select photos in the grid (shift/⌘-click),
+  toolbar shows "N geselecteerd" + "Share selected" → share dialog
+  opens scoped to those file IDs. Public view, media access and ZIP
+  download all respect the scoped list. Migration `0004_file_shares.sql`
+  adds an optional `file_ids` column to `shares`.
+
 ## 0.22.0 — 2026-04-19
 
 - Lightbox photo vertically centered via explicit flex centering.

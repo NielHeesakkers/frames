@@ -307,9 +307,24 @@ func (d *DB) SearchFiles(q SearchQuery) ([]File, error) {
 	var args []any
 	where := []string{"1=1"}
 	if q.Query != "" {
-		where = append(where, "(filename LIKE ? OR relative_path LIKE ?)")
-		p := "%" + q.Query + "%"
-		args = append(args, p, p)
+		// FTS5 for fast filename/path search. Tokenize user input into a
+		// prefix query so "berl" matches "berlin". Escape any quote and wrap
+		// each token in double-quotes for literal-token matching.
+		tokens := strings.Fields(q.Query)
+		if len(tokens) > 0 {
+			parts := make([]string, 0, len(tokens))
+			for _, t := range tokens {
+				t = strings.ReplaceAll(t, `"`, ``)
+				if t == "" {
+					continue
+				}
+				parts = append(parts, `"`+t+`"*`)
+			}
+			if len(parts) > 0 {
+				where = append(where, "id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)")
+				args = append(args, strings.Join(parts, " "))
+			}
+		}
 	}
 	if q.DateFrom != nil {
 		where = append(where, "(taken_at >= ? OR (taken_at IS NULL AND datetime(mtime,'unixepoch') >= ?))")
