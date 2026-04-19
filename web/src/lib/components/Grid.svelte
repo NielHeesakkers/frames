@@ -4,33 +4,59 @@
   import { density, sortMode, thumbShape } from '$lib/stores';
 
   export let files: any[] = [];
+  export let groupBy: 'none' | 'day' | 'week' | 'month' = 'month';
 
   $: itemSize = $density === 'small' ? 120 : $density === 'large' ? 220 : 160;
-  $: groupByMonth = $sortMode === 'takenAt';
+  // Grouping is only meaningful when sorting by capture date.
+  $: effectiveGroupBy = $sortMode === 'takenAt' ? groupBy : 'none';
 
   type Group = { key: string; label: string; items: any[] };
   const monthFmt = new Intl.DateTimeFormat('nl-NL', { month: 'long', year: 'numeric' });
+  const dayFmt = new Intl.DateTimeFormat('nl-NL', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 
-  function monthKeyOf(f: any): { key: string; label: string } {
+  function dateOf(f: any): Date | null {
     const raw: string | undefined = f.taken_at;
-    let d: Date | null = null;
     if (raw) {
-      d = new Date(raw.replace(' ', 'T'));
-      if (isNaN(d.getTime())) d = null;
+      const d = new Date(raw.replace(' ', 'T'));
+      if (!isNaN(d.getTime())) return d;
     }
-    if (!d && f.mtime) d = new Date(f.mtime * 1000);
+    if (f.mtime) return new Date(f.mtime * 1000);
+    return null;
+  }
+
+  // ISO-week helpers — Monday-based week, year-week like "2024-W14".
+  function isoWeek(d: Date): { year: number; week: number } {
+    const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = (target.getUTCDay() + 6) % 7; // 0 = Monday
+    target.setUTCDate(target.getUTCDate() - dayNum + 3);
+    const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+    const diff = target.getTime() - firstThursday.getTime();
+    const week = 1 + Math.round(diff / (7 * 24 * 3600 * 1000));
+    return { year: target.getUTCFullYear(), week };
+  }
+
+  function groupKeyOf(f: any, mode: string): { key: string; label: string } {
+    const d = dateOf(f);
     if (!d) return { key: 'unknown', label: 'Zonder datum' };
+    if (mode === 'day') {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      return { key, label: dayFmt.format(d).replace(/^./, (c) => c.toUpperCase()) };
+    }
+    if (mode === 'week') {
+      const { year, week } = isoWeek(d);
+      return { key: `${year}-W${week}`, label: `Week ${week} · ${year}` };
+    }
+    // month (default)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const label = monthFmt.format(d).replace(/^./, (c) => c.toUpperCase());
-    return { key, label };
+    return { key, label: monthFmt.format(d).replace(/^./, (c) => c.toUpperCase()) };
   }
 
   $: groups = (() => {
-    if (!groupByMonth) return null as Group[] | null;
+    if (effectiveGroupBy === 'none') return null as Group[] | null;
     const out: Group[] = [];
     let cur: Group | null = null;
     for (const f of files) {
-      const { key, label } = monthKeyOf(f);
+      const { key, label } = groupKeyOf(f, effectiveGroupBy);
       if (!cur || cur.key !== key) {
         cur = { key, label, items: [] };
         out.push(cur);

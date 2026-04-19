@@ -2,6 +2,14 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.37.0 — 2026-04-19
+
+- **Group-by filter** in the toolbar with options "Niet groeperen",
+  "Per dag", "Per week", "Per maand". Each album (folder path)
+  remembers its own choice in `localStorage`. Week grouping uses the
+  ISO-week definition (Monday start). Only meaningful when sorting by
+  capture date — the dropdown is disabled otherwise.
+
 ## 0.36.0 — 2026-04-19
 
 - DB migration `0005_fix_rotated_dims.sql` backfills width/height for

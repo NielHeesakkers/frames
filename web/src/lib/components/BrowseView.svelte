@@ -19,6 +19,26 @@
   let files: any[] = [];
   let loading = true;
 
+  // Grouping choice, remembered per album (folder path) in localStorage.
+  type GroupBy = 'none' | 'day' | 'week' | 'month';
+  const groupKey = (p: string) => `frames.groupBy.${p || '__root__'}.v1`;
+  function loadGroupBy(p: string): GroupBy {
+    if (typeof localStorage === 'undefined') return 'month';
+    const raw = localStorage.getItem(groupKey(p));
+    if (raw === 'none' || raw === 'day' || raw === 'week' || raw === 'month') return raw;
+    return 'month';
+  }
+  function saveGroupBy(p: string, v: GroupBy) {
+    try { localStorage.setItem(groupKey(p), v); } catch {}
+  }
+  let groupBy: GroupBy = loadGroupBy(path);
+  $: groupBy = loadGroupBy(path);
+  function onGroupChange(e: Event) {
+    const v = (e.currentTarget as HTMLSelectElement).value as GroupBy;
+    groupBy = v;
+    saveGroupBy(path, v);
+  }
+
   let latestFiles: any[] = [];
   let subtreeLatest: any[] = [];
 
@@ -138,6 +158,13 @@
       <option value="square">Squares</option>
       <option value="original">Oorspronkelijke verhouding</option>
     </select>
+    <select value={groupBy} on:change={onGroupChange} title="Groeperen"
+            disabled={$sortMode !== 'takenAt'}>
+      <option value="none">Niet groeperen</option>
+      <option value="day">Per dag</option>
+      <option value="week">Per week</option>
+      <option value="month">Per maand</option>
+    </select>
     <div class="spacer" />
     {#if $selection.size > 0}
       <span class="sel-count">{$selection.size} geselecteerd</span>
@@ -185,7 +212,7 @@
         <section class="files-section">
           <h3>Foto's{files.length > 0 ? ` (${files.length})` : ''}</h3>
           {#if files.length > 0}
-            <Grid files={files} on:context={onContext} />
+            <Grid files={files} {groupBy} on:context={onContext} />
           {:else if subtreeLatest.length > 0}
             <p class="sub-caption">Laatste toegevoegd in deze map (submappen inbegrepen)</p>
             <div class="latest-grid">
