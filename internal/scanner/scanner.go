@@ -93,10 +93,24 @@ func (s *Scanner) handleDir(dir dirEntry, files []fileEntry, full bool, stats *S
 		return err
 	}
 
-	// Pull existing files for this folder.
-	existingFiles, err := s.DB.FilesInFolder(folderID, 100000, 0, db.SortByName)
-	if err != nil {
-		return err
+	// Pull existing files for this folder, paginating so folders with
+	// more than the batch size aren't silently truncated.
+	const batch = 10000
+	var existingFiles []db.File
+	offset := 0
+	for {
+		chunk, err := s.DB.FilesInFolder(folderID, batch, offset, db.SortByName)
+		if err != nil {
+			return err
+		}
+		existingFiles = append(existingFiles, chunk...)
+		if len(chunk) < batch {
+			break
+		}
+		offset += batch
+	}
+	if len(existingFiles) > 50000 {
+		s.Log.Warn("large folder", "path", dir.RelPath, "count", len(existingFiles))
 	}
 	byName := make(map[string]db.File, len(existingFiles))
 	for _, f := range existingFiles {
