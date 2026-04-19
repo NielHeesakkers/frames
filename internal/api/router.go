@@ -71,6 +71,8 @@ func NewRouter(d Deps) http.Handler {
 			r.Get("/folder", bd.handleFolder)
 			r.Get("/folder/*", bd.handleFolder)
 			r.Get("/tree", bd.handleTree)
+			r.Get("/folder_stats", bd.handleFolderStats)
+				r.Get("/folder_files", bd.handleFolderFiles)
 			r.Get("/file/{id}", bd.handleFile)
 			r.Post("/file/{id}/rating", bd.handleSetRating)
 
@@ -126,15 +128,16 @@ func NewRouter(d Deps) http.Handler {
 
 	// Public share-link surface (unauthenticated, no CSRF).
 	psh := &publicShareDeps{
-		DB:       d.DB,
-		Cache:    d.Cache,
-		Root:     d.Root,
-		Limiter:  share.NewRateLimiter(100, time.Minute),
-		Upload:   d.UploadSvc,
-		Queue:    d.Queue,
-		MaxBytes: d.ShareUploadMax,
-		Log:      d.Log,
-		Secure:   d.Secure,
+		DB:        d.DB,
+		Cache:     d.Cache,
+		Root:      d.Root,
+		Limiter:   share.NewRateLimiter(100, time.Minute),
+		Upload:    d.UploadSvc,
+		Queue:     d.Queue,
+		MaxBytes:  d.ShareUploadMax,
+		Log:       d.Log,
+		Secure:    d.Secure,
+		PublicURL: d.PublicURL,
 	}
 	r.Route("/api/s", func(r chi.Router) {
 		r.Post("/{token}/unlock", psh.handleUnlock)
@@ -146,6 +149,10 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/{token}/zip", psh.handleZip)
 		r.Post("/{token}/upload", psh.handleAnonymousUpload)
 	})
+
+	// Share landing page: serve the SPA shell with OpenGraph meta tags injected
+	// so link previews (Slack, WhatsApp, iMessage…) show the first photo.
+	r.Get("/s/{token}", psh.handleShareLanding)
 
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {

@@ -49,6 +49,13 @@ func (md *metaDeps) handleLatest(w http.ResponseWriter, r *http.Request) {
 	filesLimit := clampInt(r.URL.Query().Get("files"), 10, 1, 50)
 	foldersLimit := clampInt(r.URL.Query().Get("folders"), 10, 0, 50)
 	scopePath := r.URL.Query().Get("path")
+	// When random=1 the files are drawn via ORDER BY RANDOM() so a
+	// container folder's preview shows a pleasing mix across its subtree
+	// instead of always the most-recently-scanned batch.
+	orderClause := "ORDER BY id DESC"
+	if r.URL.Query().Get("random") == "1" {
+		orderClause = "ORDER BY RANDOM()"
+	}
 
 	filesOut := make([]latestFileDTO, 0, filesLimit)
 
@@ -59,7 +66,7 @@ func (md *metaDeps) handleLatest(w http.ResponseWriter, r *http.Request) {
 			SELECT id, filename, kind, mime_type, folder_id, relative_path, taken_at
 			FROM files
 			WHERE kind IN ('image','raw','video')
-			ORDER BY id DESC
+			`+orderClause+`
 			LIMIT ?
 		`, filesLimit)
 	} else {
@@ -79,7 +86,7 @@ func (md *metaDeps) handleLatest(w http.ResponseWriter, r *http.Request) {
 			FROM files
 			WHERE folder_id IN (SELECT id FROM subtree)
 			  AND kind IN ('image','raw','video')
-			ORDER BY id DESC
+			`+orderClause+`
 			LIMIT ?
 		`, folder.ID, filesLimit)
 	}

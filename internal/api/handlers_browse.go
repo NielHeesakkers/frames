@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -81,10 +83,39 @@ func (bd *browseDeps) handleFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Recursive item totals for each child folder so the "Submappen" cards
+	// show the same count as the sidebar tree — users expect "Drone" inside
+	// "2020 Schotland" to show its entire subtree count, not the direct
+	// children only.
+	totals := make(map[int64]int64, len(children))
+	if rows, err := bd.DB.Query(`
+		WITH RECURSIVE subtree(ancestor_id, descendant_id) AS (
+			SELECT id, id FROM folders WHERE parent_id = ?
+			UNION ALL
+			SELECT s.ancestor_id, f.id FROM folders f JOIN subtree s ON f.parent_id = s.descendant_id
+		)
+		SELECT s.ancestor_id, COUNT(files.id)
+		FROM subtree s
+		LEFT JOIN files ON files.folder_id = s.descendant_id
+		GROUP BY s.ancestor_id
+	`, f.ID); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var id, count int64
+			if err := rows.Scan(&id, &count); err == nil {
+				totals[id] = count
+			}
+		}
+	}
+
 	foldersOut := make([]folderDTO, 0, len(children))
 	for _, c := range children {
+		items := c.ItemCount
+		if t, ok := totals[c.ID]; ok {
+			items = t
+		}
 		foldersOut = append(foldersOut, folderDTO{
-			ID: c.ID, ParentID: c.ParentID, Path: c.Path, Name: c.Name, Items: c.ItemCount,
+			ID: c.ID, ParentID: c.ParentID, Path: c.Path, Name: c.Name, Items: items,
 		})
 	}
 	filesOut := make([]fileDTO, 0, len(files))
@@ -178,6 +209,148 @@ func (bd *browseDeps) handleSetRating(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleFolderFiles returns every file under a folder's subtree (recursive)
+// optionally filtered by a type label ("JPG", "ARW", "MOV"…). Unlike
+// /api/folder (which only returns direct children) this one spans all
+// descendant folders so clicking the "JPG · 1,110" pill in a container
+// folder actually shows all 1,110 JPGs wherever they live.
+func (bd *browseDeps) handleFolderFiles(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	typeFilter := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("type")))
+	folder, err := bd.DB.FolderByPath(path)
+	if err != nil {
+		WriteError(w, http.StatusNotFound, "folder not found")
+		return
+	}
+	// Pull the whole subtree once; filter in Go so the type matching matches
+	// typeLabel() exactly (same alias handling as the pill counts).
+	rows, err := bd.DB.Query(`
+		WITH RECURSIVE subtree(id) AS (
+			SELECT ? UNION ALL
+			SELECT f.id FROM folders f JOIN subtree s ON f.parent_id = s.id
+		)
+		SELECT id, filename, size, kind, mime_type, mtime, taken_at,
+		       width, height, thumb_status, preview_status, rating
+		FROM files WHERE folder_id IN (SELECT id FROM subtree)
+		ORDER BY COALESCE(taken_at, CAST(mtime AS TEXT)) DESC, id DESC
+	`, folder.ID)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer rows.Close()
+	out := make([]fileDTO, 0, 256)
+	for rows.Next() {
+		var (
+			id                                      int64
+			name, kind, mime, thumbStatus, previewStatus string
+			size, mtime                             int64
+			takenAt                                 *string
+			width, height                           *int
+			rating                                  int
+		)
+		if err := rows.Scan(&id, &name, &size, &kind, &mime, &mtime, &takenAt,
+			&width, &height, &thumbStatus, &previewStatus, &rating); err != nil {
+			continue
+		}
+		if typeFilter != "" {
+			label := typeLabel(name, mime, kind)
+			if !strings.EqualFold(label, typeFilter) {
+				continue
+			}
+		}
+		out = append(out, fileDTO{
+			ID: id, Name: name, Size: size, Kind: kind,
+			MimeType: mime, Mtime: mtime, TakenAt: takenAt,
+			Width: width, Height: height,
+			ThumbStatus: thumbStatus, PreviewStatus: previewStatus,
+			Rating: rating,
+		})
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"files": out}})
+}
+
+// handleFolderStats returns file-type counts for a folder subtree — groups
+// by a derived label (JPG, HEIC, ARW, MOV, PDF, …) so the frontend can show
+// "219 JPG · 5 MOV · 12 ARW" above a folder.
+func (bd *browseDeps) handleFolderStats(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	folder, err := bd.DB.FolderByPath(path)
+	if err != nil {
+		WriteError(w, http.StatusNotFound, "folder not found")
+		return
+	}
+	rows, err := bd.DB.Query(`
+		WITH RECURSIVE subtree(id) AS (
+			SELECT ? UNION ALL
+			SELECT f.id FROM folders f JOIN subtree s ON f.parent_id = s.id
+		)
+		SELECT filename, mime_type, kind
+		FROM files WHERE folder_id IN (SELECT id FROM subtree)
+	`, folder.ID)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer rows.Close()
+	counts := map[string]int64{}
+	for rows.Next() {
+		var fn, mt, kind string
+		if err := rows.Scan(&fn, &mt, &kind); err != nil {
+			continue
+		}
+		label := typeLabel(fn, mt, kind)
+		if label == "" {
+			continue
+		}
+		counts[label]++
+	}
+	// Emit sorted by count desc for stable client ordering.
+	type entry struct {
+		Label string `json:"label"`
+		Count int64  `json:"count"`
+	}
+	out := make([]entry, 0, len(counts))
+	for k, v := range counts {
+		out = append(out, entry{k, v})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return out[i].Label < out[j].Label
+	})
+	WriteJSON(w, http.StatusOK, map[string]any{"data": out})
+}
+
+// typeLabel maps a file to a short, UI-friendly type label. Prefers the
+// extension since that's what users actually recognise; falls back to the
+// MIME type when the filename has none.
+func typeLabel(filename, mime, kind string) string {
+	lc := strings.ToLower(filename)
+	if i := strings.LastIndex(lc, "."); i >= 0 && i < len(lc)-1 {
+		ext := strings.ToUpper(lc[i+1:])
+		// Normalise the common aliases.
+		switch ext {
+		case "JPEG":
+			return "JPG"
+		case "TIFF":
+			return "TIF"
+		}
+		return ext
+	}
+	// No extension — use broad kind.
+	switch kind {
+	case "image":
+		return "Afbeelding"
+	case "video":
+		return "Video"
+	case "raw":
+		return "RAW"
+	}
+	return "Overig"
 }
 
 func (bd *browseDeps) handleTree(w http.ResponseWriter, r *http.Request) {

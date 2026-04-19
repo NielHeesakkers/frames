@@ -80,12 +80,17 @@
       </div>
     {/if}
 
-    <div class="grid">
+    <div class="jgrid" style="--size: 180px">
       {#each files as f (f.id)}
-        <a class="cell" href={`/api/s/${token}/original/${f.id}`} target="_blank">
+        {@const a = f.width && f.height ? f.width / f.height : 1}
+        <a class="jslot" href={`/api/s/${token}/original/${f.id}`} target="_blank"
+           style="flex-grow: {a}; flex-basis: calc({a} * var(--size));
+                  min-width: calc({a} * var(--size) * 0.55);
+                  aspect-ratio: {a};">
           <img src={`/api/s/${token}/thumb/${f.id}`} alt={f.name} loading="lazy" />
         </a>
       {/each}
+      <div class="jfiller" />
     </div>
 
     {#if meta.allow_upload}
@@ -112,9 +117,14 @@
   .fcards { display: grid; grid-template-columns: repeat(auto-fill, 180px); gap: 8px; padding: 8px 0; }
   .fcard { background: var(--bg-2); border-radius: 6px; padding: 12px; text-decoration: none;
     color: var(--fg); border: 1px solid var(--border); }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, 160px); gap: 4px; margin-top: 12px; }
-  .cell { display: block; aspect-ratio: 1; overflow: hidden; border-radius: 3px; }
-  .cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* Justified rows zodat foto's hun oorspronkelijke verhouding houden. Elke
+     tegel heeft flex-grow + flex-basis gelijk aan zijn aspect ratio, zodat
+     rijen de containerbreedte precies vullen zonder croppen. */
+  .jgrid { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 12px; }
+  .jslot { display: block; min-height: 60px; overflow: hidden; border-radius: 3px;
+    background: var(--bg-2); position: relative; }
+  .jslot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .jfiller { flex: 99 1 0; height: 0; pointer-events: none; }
   .upload { margin-top: 20px; display: flex; gap: 8px; }
   .err { color: var(--danger); }
 </style>

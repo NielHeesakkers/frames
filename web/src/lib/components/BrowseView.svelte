@@ -18,6 +18,34 @@
   let folders: any[] = [];
   let files: any[] = [];
   let loading = true;
+  // File-type breakdown across the whole subtree (recursive) — shown above
+  // the submap/foto cards so you can see "there are 219 JPG and 5 MOV" at
+  // a glance. Pills are clickable to filter the visible grid.
+  let typeStats: { label: string; count: number }[] = [];
+  let activeType: string | null = null;
+  // When a type pill is active we fetch ALL files of that type from the
+  // whole subtree (not just the current folder's direct files) so "MP4 · 1"
+  // actually surfaces the one MP4 wherever it lives.
+  let typedFiles: any[] = [];
+  let typedLoading = false;
+  $: visibleFiles = activeType ? typedFiles : files;
+
+  async function selectType(label: string) {
+    if (activeType === label) {
+      activeType = null;
+      typedFiles = [];
+      return;
+    }
+    activeType = label;
+    typedLoading = true;
+    try {
+      const r = await api.folderFiles(path, label);
+      typedFiles = r.files;
+    } catch {
+      typedFiles = [];
+    }
+    typedLoading = false;
+  }
 
   // Grouping choice, remembered per album (folder path) in localStorage.
   type GroupBy = 'none' | 'day' | 'week' | 'month';
@@ -59,7 +87,9 @@
 
   async function load() {
     loading = true;
-    const sort = $sortMode === 'takenAt' ? 'taken' : $sortMode;  // backend expects taken|name|size|rating
+    activeType = null;
+    typedFiles = [];
+    const sort = $sortMode === 'takenAt' ? 'taken' : $sortMode;
     try {
       const r = await api.folder(path, { sort, limit: 50000 });
       folder = r.folder;
@@ -69,6 +99,13 @@
       folder = null;
       folders = [];
       files = [];
+    }
+    // Subtree-wide type stats (recursive — so a parent folder with only
+    // submappen still shows the aggregate counts).
+    try {
+      typeStats = await api.folderStats(path);
+    } catch {
+      typeStats = [];
     }
     if (atRoot) {
       try {
@@ -81,8 +118,10 @@
     } else {
       latestFiles = [];
       if (files.length === 0) {
+        // Container folder (geen directe files) — toon een willekeurige
+        // greep uit het hele subtree als sfeerbeeld.
         try {
-          const l = await api.latest(10, 0, path);
+          const l = await api.latest(10, 0, path, true);
           subtreeLatest = l.files;
         } catch {
           subtreeLatest = [];
@@ -193,6 +232,23 @@
         </section>
       {/if}
 
+      {#if !atRoot && typeStats.length > 0}
+        <section>
+          <h3>Files</h3>
+          <div class="type-pills">
+            {#each typeStats as t}
+              <button class="pill" class:active={activeType === t.label}
+                      on:click={() => selectType(t.label)}>
+                <strong>{t.label}</strong> · {t.count.toLocaleString()}
+              </button>
+            {/each}
+            {#if activeType}
+              <button class="pill clear" on:click={() => { activeType = null; typedFiles = []; }}>Toon alles</button>
+            {/if}
+          </div>
+        </section>
+      {/if}
+
       {#if !atRoot && folders.length > 0}
         <section>
           <h3>Submappen</h3>
@@ -210,14 +266,16 @@
 
       {#if !atRoot}
         <section class="files-section">
-          <h3>Foto's{files.length > 0 ? ` (${files.length})` : ''}</h3>
-          {#if files.length > 0}
-            <Grid files={files} {groupBy} on:context={onContext} />
+          <h3>Foto's{visibleFiles.length > 0 ? ` (${visibleFiles.length.toLocaleString()}${activeType ? ` ${activeType}` : ''})` : ''}</h3>
+          {#if typedLoading}
+            <div class="empty">Bestanden ophalen…</div>
+          {:else if visibleFiles.length > 0}
+            <Grid files={visibleFiles} {groupBy} on:context={onContext} />
           {:else if subtreeLatest.length > 0}
-            <p class="sub-caption">Laatste toegevoegd in deze map (submappen inbegrepen)</p>
-            <div class="latest-grid">
+            <p class="sub-caption">Een greep uit deze map (submappen inbegrepen)</p>
+            <div class="mosaic">
               {#each subtreeLatest as lf}
-                <a class="latest-cell" href={`/file/${lf.id}`}>
+                <a class="mosaic-cell" href={`/file/${lf.id}`}>
                   <img src={`/api/thumb/${lf.id}?v=${lf.mtime ?? 0}`} alt={lf.name} loading="lazy" />
                 </a>
               {/each}
@@ -299,4 +357,36 @@
   .empty { padding: 16px; color: var(--fg-dim); font-style: italic; }
   .sub-caption { margin: 0 16px 6px; color: var(--fg-dim); font-size: 12px; font-style: italic; }
   .sel-count { color: var(--accent); font-size: 13px; margin-right: 4px; }
+
+  /* Sfeerbeeld-mozaïek voor container-mappen zonder directe foto's: 10 willekeurige
+     foto's uit het subtree in een asymmetrisch patroon (1 hero + variatie). */
+  .mosaic { display: grid; grid-template-columns: repeat(6, 1fr);
+    grid-auto-rows: 110px; gap: 4px; padding: 0 16px 12px; grid-auto-flow: dense; }
+  .mosaic-cell { display: block; overflow: hidden; border-radius: 4px;
+    background: var(--bg-2); border: 1px solid var(--border); }
+  .mosaic-cell img { width: 100%; height: 100%; object-fit: cover; display: block;
+    transition: transform 0.4s ease; }
+  .mosaic-cell:hover img { transform: scale(1.06); }
+  .mosaic > :nth-child(1) { grid-column: span 3; grid-row: span 2; }
+  .mosaic > :nth-child(2) { grid-column: span 3; grid-row: span 1; }
+  .mosaic > :nth-child(4) { grid-column: span 2; grid-row: span 1; }
+  .mosaic > :nth-child(5) { grid-column: span 2; grid-row: span 2; }
+  .mosaic > :nth-child(8) { grid-column: span 2; grid-row: span 1; }
+  .mosaic > :nth-child(9) { grid-column: span 2; grid-row: span 1; }
+  .mosaic > :nth-child(10) { grid-column: span 2; grid-row: span 1; }
+  @media (max-width: 780px) {
+    .mosaic { grid-template-columns: repeat(3, 1fr); grid-auto-rows: 100px; }
+    .mosaic > :nth-child(n) { grid-column: span 1; grid-row: span 1; }
+    .mosaic > :nth-child(1) { grid-column: span 3; grid-row: span 2; }
+  }
+
+  .type-pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 6px; }
+  .pill { background: var(--bg-2); border: 1px solid var(--border);
+    color: var(--fg-dim); padding: 4px 12px; border-radius: 14px;
+    font-size: 12px; cursor: pointer; transition: border-color 0.08s, color 0.08s, background 0.08s; }
+  .pill:hover { color: var(--fg); border-color: var(--fg-dim); }
+  .pill strong { color: var(--fg); margin-right: 2px; }
+  .pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .pill.active strong { color: #fff; }
+  .pill.clear { background: transparent; border-style: dashed; color: var(--fg-dim); }
 </style>

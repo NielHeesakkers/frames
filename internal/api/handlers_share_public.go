@@ -3,6 +3,7 @@ package api
 
 import (
 	"encoding/json"
+	"html"
 	"log/slog"
 	"net/http"
 	"os"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/NielHeesakkers/frames/internal/auth"
 	"github.com/NielHeesakkers/frames/internal/db"
+	"github.com/NielHeesakkers/frames/internal/frontend"
 	"github.com/NielHeesakkers/frames/internal/scanner"
 	"github.com/NielHeesakkers/frames/internal/share"
 	"github.com/NielHeesakkers/frames/internal/thumbnail"
@@ -26,15 +28,16 @@ import (
 // cookie, and scope.
 
 type publicShareDeps struct {
-	DB       *db.DB
-	Cache    thumbnailCache // interface to avoid import cycle
-	Root     string
-	Limiter  *share.RateLimiter
-	Upload   *upload.Service
-	Queue    *thumbnail.Queue
-	MaxBytes int64
-	Log      *slog.Logger
-	Secure   bool
+	DB        *db.DB
+	Cache     thumbnailCache // interface to avoid import cycle
+	Root      string
+	Limiter   *share.RateLimiter
+	Upload    *upload.Service
+	Queue     *thumbnail.Queue
+	MaxBytes  int64
+	Log       *slog.Logger
+	Secure    bool
+	PublicURL string
 }
 
 // thumbnailCache is a minimal interface matching *thumbnail.Cache.
@@ -240,8 +243,11 @@ func (psh *publicShareDeps) handleFileMedia(kind string) http.HandlerFunc {
 		switch kind {
 		case "thumb":
 			path := psh.Cache.ThumbPath(id)
+			// Thumbs in the cache are WebP — send image/webp, not the source
+			// file's mime (would be video/quicktime for .MOV, which makes the
+			// browser reject the response).
 			serveWithETag(w, r, path,
-				"s-"+strconv.FormatInt(f.ID, 10)+"-"+strconv.FormatInt(f.Mtime, 10), f.MimeType)
+				"s-"+strconv.FormatInt(f.ID, 10)+"-"+strconv.FormatInt(f.Mtime, 10), "image/webp")
 		case "preview":
 			path := psh.Cache.PreviewPath(id)
 			serveWithETag(w, r, path,
@@ -379,6 +385,120 @@ func (psh *publicShareDeps) ensureFolder(rel string) error {
 		parentID = &created.ID
 	}
 	return nil
+}
+
+// handleShareLanding serves the SvelteKit index.html with OpenGraph meta tags
+// injected so Slack, WhatsApp, iMessage, Twitter, etc. show a rich preview
+// (title + first photo) when the share URL is pasted. The SPA still boots
+// client-side and the user sees the normal share page. For password-protected
+// shares we deliberately DO NOT leak the first photo — the preview shows only
+// a generic title.
+func (psh *publicShareDeps) handleShareLanding(w http.ResponseWriter, r *http.Request) {
+	idx, err := frontend.IndexHTML()
+	if err != nil {
+		// Fall back to the plain frontend handler; SPA will still work.
+		frontend.Handler().ServeHTTP(w, r)
+		return
+	}
+
+	tok := chi.URLParam(r, "token")
+	s, sErr := psh.DB.ShareByToken(tok)
+	valid := sErr == nil && share.Validate(s) == share.StatusActive
+
+	title := "Gedeeld album"
+	description := "Bekijk dit gedeelde album op Frames."
+	var ogImage string
+
+	if valid {
+		if folder, err := psh.DB.FolderByID(s.FolderID); err == nil && folder != nil && folder.Name != "" {
+			title = folder.Name
+		}
+		if s.PasswordHash != nil {
+			description = "Dit album is met een wachtwoord beveiligd."
+		} else if firstID := psh.pickCoverFileID(s); firstID > 0 && psh.PublicURL != "" {
+			ogImage = strings.TrimRight(psh.PublicURL, "/") + "/api/s/" + tok + "/preview/" + strconv.FormatInt(firstID, 10)
+		}
+	}
+
+	shareURL := ""
+	if psh.PublicURL != "" {
+		shareURL = strings.TrimRight(psh.PublicURL, "/") + "/s/" + tok
+	}
+
+	var og strings.Builder
+	// Basic meta.
+	og.WriteString(`<meta name="description" content="` + html.EscapeString(description) + `" />` + "\n")
+	// OpenGraph.
+	og.WriteString(`<meta property="og:type" content="website" />` + "\n")
+	og.WriteString(`<meta property="og:site_name" content="Frames" />` + "\n")
+	og.WriteString(`<meta property="og:title" content="` + html.EscapeString(title) + `" />` + "\n")
+	og.WriteString(`<meta property="og:description" content="` + html.EscapeString(description) + `" />` + "\n")
+	if shareURL != "" {
+		og.WriteString(`<meta property="og:url" content="` + html.EscapeString(shareURL) + `" />` + "\n")
+	}
+	if ogImage != "" {
+		og.WriteString(`<meta property="og:image" content="` + html.EscapeString(ogImage) + `" />` + "\n")
+		og.WriteString(`<meta property="og:image:alt" content="` + html.EscapeString(title) + `" />` + "\n")
+	}
+	// Twitter.
+	og.WriteString(`<meta name="twitter:card" content="` + func() string {
+		if ogImage != "" {
+			return "summary_large_image"
+		}
+		return "summary"
+	}() + `" />` + "\n")
+	og.WriteString(`<meta name="twitter:title" content="` + html.EscapeString(title) + `" />` + "\n")
+	og.WriteString(`<meta name="twitter:description" content="` + html.EscapeString(description) + `" />` + "\n")
+	if ogImage != "" {
+		og.WriteString(`<meta name="twitter:image" content="` + html.EscapeString(ogImage) + `" />` + "\n")
+	}
+
+	// Inject just before </head>. Also override the default <title> so the
+	// browser tab shows the album name before the SPA mounts.
+	doc := strings.Replace(idx,
+		"<title>Frames</title>",
+		"<title>"+html.EscapeString(title)+" · Frames</title>",
+		1)
+	doc = strings.Replace(doc, "</head>", og.String()+"</head>", 1)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// Keep caches short — share metadata can change (rename, revoke).
+	w.Header().Set("Cache-Control", "no-store, must-revalidate")
+	_, _ = w.Write([]byte(doc))
+}
+
+// pickCoverFileID returns the ID of the photo to use as OpenGraph image —
+// the first file when the share is file-scoped, otherwise the earliest
+// "taken_at" photo from the folder subtree. Returns 0 when no suitable
+// image file exists.
+func (psh *publicShareDeps) pickCoverFileID(s *db.Share) int64 {
+	if len(s.FileIDs) > 0 {
+		for _, id := range s.FileIDs {
+			f, err := psh.DB.FileByID(id)
+			if err == nil && f != nil && (f.Kind == "image" || f.Kind == "raw") {
+				return f.ID
+			}
+		}
+		// No image file — fall back to the first entry regardless.
+		return s.FileIDs[0]
+	}
+	// Folder-scoped: pick earliest-taken image from subtree.
+	row := psh.DB.QueryRow(`
+		WITH RECURSIVE subtree(id) AS (
+			SELECT ? UNION ALL
+			SELECT f.id FROM folders f JOIN subtree s ON f.parent_id = s.id
+		)
+		SELECT files.id FROM files
+		WHERE files.folder_id IN (SELECT id FROM subtree)
+		  AND files.kind IN ('image','raw')
+		ORDER BY COALESCE(files.taken_at, files.mtime) ASC, files.id ASC
+		LIMIT 1
+	`, s.FolderID)
+	var id int64
+	if err := row.Scan(&id); err != nil {
+		return 0
+	}
+	return id
 }
 
 func sanitizeName(s string) string {

@@ -57,7 +57,11 @@ func (md *mediaDeps) handleThumb(w http.ResponseWriter, r *http.Request) {
 	}
 	path := md.Cache.ThumbPath(id)
 	if fi, err := os.Stat(path); err == nil && fi.Size() > 0 {
-		serveWithETag(w, r, path, fmt.Sprintf("%d-%d", f.ID, f.Mtime), f.MimeType)
+		// Thumb cache files are always WebP regardless of source mime; sending
+		// f.MimeType (e.g. "video/quicktime" for .MOV) caused browsers to
+		// reject the response and fire <img onerror>, locking the tile into
+		// the "Thumb wordt gegenereerd…" overlay. Always advertise image/webp.
+		serveWithETag(w, r, path, fmt.Sprintf("%d-%d", f.ID, f.Mtime), "image/webp")
 		return
 	}
 	// Not ready yet — boost in queue, 202.

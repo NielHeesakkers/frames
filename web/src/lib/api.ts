@@ -51,6 +51,14 @@ export const api = {
   tree: (parent?: string) =>
     req<Array<{ id: number; path: string; name: string; has_child: boolean; items: number }>>(
       'GET', `/api/tree${parent ? `?parent=${encodeURIComponent(parent)}` : ''}`),
+  folderStats: (path: string) =>
+    req<Array<{ label: string; count: number }>>(
+      'GET', `/api/folder_stats?path=${encodeURIComponent(path)}`),
+  folderFiles: (path: string, type?: string) => {
+    const q = new URLSearchParams({ path });
+    if (type) q.set('type', type);
+    return req<{ files: any[] }>('GET', `/api/folder_files?${q}`);
+  },
   file: (id: number) => req<any>('GET', `/api/file/${id}`),
   setRating: (id: number, rating: number) =>
     req<void>('POST', `/api/file/${id}/rating`, { rating }),
@@ -97,9 +105,10 @@ export const api = {
     req<void>('POST', '/api/account/password', { old, new: neo }),
 
   version: () => req<{ version: string; changelog: string }>('GET', '/api/version'),
-  latest: (filesLimit = 10, foldersLimit = 10, path?: string) => {
+  latest: (filesLimit = 10, foldersLimit = 10, path?: string, random = false) => {
     const q = new URLSearchParams({ files: String(filesLimit), folders: String(foldersLimit) });
     if (path) q.set('path', path);
+    if (random) q.set('random', '1');
     return req<{ files: any[]; folders: any[] }>('GET', `/api/latest?${q}`);
   }
 };

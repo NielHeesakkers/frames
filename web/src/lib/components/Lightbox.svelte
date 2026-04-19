@@ -125,9 +125,6 @@
 <svelte:window on:mousemove={onMouseMove} on:mouseup={onMouseUp} />
 
 <div class="lightbox">
-  <div class="topbar">
-    <button class="iconbtn" on:click={() => (showHelp = !showHelp)} title="Sneltoetsen (?)">?</button>
-  </div>
   <button class="close" on:click={close} title="Sluiten (Esc)">✕</button>
 
   <button class="nav left" on:click={prev} disabled={!hasPrev} title="Vorige (←)">‹</button>

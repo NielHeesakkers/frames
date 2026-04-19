@@ -2,6 +2,77 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.45.0 — 2026-04-19
+
+- **Fix: video thumbnails bleven hangen op "Thumb wordt gegenereerd…"**
+  De thumb-endpoint stuurde `Content-Type: video/quicktime` voor MOV-
+  bestanden, terwijl de cache-file een WebP-afbeelding is. De browser
+  weigerde dan de response te renderen als `<img>` en de onerror-
+  handler zette de tegel permanent in pending-state. Beide thumb-
+  endpoints (auth + public share) sturen nu altijd `image/webp` — wat
+  overeenkomt met wat er feitelijk in het cache-bestand staat.
+- **Gedeelde link-pagina toont foto's in oorspronkelijke verhouding**:
+  de `/s/<token>` grid gebruikt nu dezelfde justified-rows flexbox-
+  layout als de hoofdapp. Foto's worden niet meer naar vierkant gecropt;
+  panorama's, portretten en wide-format MOV's houden hun natuurlijke
+  verhouding en rijen vullen de breedte exact.
+
+## 0.44.0 — 2026-04-19
+
+- **Sfeerbeeld-mozaïek voor container-mappen**: in een map zonder eigen
+  foto's (bijv. "2020 Schotland") verschijnt nu een asymmetrisch mozaïek
+  met 10 willekeurige foto's uit het hele subtree — één grote hero, een
+  wide-format en wat varianten daaromheen. Vervangt de oude 10-in-een-rij
+  latest-grid die altijd hetzelfde zag omdat "ORDER BY id DESC" nooit
+  variëert. Responsief: klapt naar een 3-koloms layout op smalle schermen.
+- Tekst "Laatste toegevoegd in deze map" → "Een greep uit deze map
+  (submappen inbegrepen)" — dekt de nieuwe random-modus beter.
+- Backend: `/api/latest?random=1` gebruikt `ORDER BY RANDOM()` in plaats
+  van `ORDER BY id DESC` voor zowel globale als subtree-scope zoekacties.
+
+## 0.43.0 — 2026-04-19
+
+- **Type-filter pills tonen nu de volledige substructuur**: als je in een
+  containermap op bijvoorbeeld "MP4 · 1" klikt terwijl de map zelf geen
+  directe MP4-bestanden heeft, laat de grid nu het MP4-bestand uit de
+  onderliggende map zien. Voorheen filterde het alleen de direct in de
+  huidige map aanwezige bestanden waardoor je soms een lege grid zag
+  terwijl de pill "1" aangaf.
+- Nieuwe backend endpoint `/api/folder_files?path=…&type=…` — recursieve
+  CTE over het subtree + type-matching via dezelfde `typeLabel` als de
+  pill-tellers, zodat counts en grid 1-op-1 overeenkomen.
+
+## 0.42.0 — 2026-04-19
+
+- **Rich link previews voor gedeelde albums**: de Go-backend serveert nu
+  `/s/<token>` met ge-injecteerde OpenGraph- en Twitter-Card meta tags.
+  Plakt iemand een deellink in Slack / WhatsApp / iMessage / Discord
+  dan verschijnt de albumnaam en de eerste foto uit het subtree als
+  preview. Voor wachtwoord-beveiligde shares wordt er géén afbeelding
+  gelekt, alleen een generieke titel.
+- **Submap-kaarten tonen recursieve totalen**: in de "Submappen" sectie
+  van een map laat elke kaart nu het totaal aantal bestanden van de
+  hele substructuur zien (zelfde logica als de sidebar-boom). "Drone"
+  binnen "2020 Schotland" toonde voorheen "0 items" omdat alleen de
+  directe children werden geteld; nu ziet de gebruiker het werkelijke
+  aantal.
+- **"?" helpknop verwijderd uit de lightbox** — die dobberde wat
+  rommelig in de linkerbovenhoek van de preview. De sneltoets `?` opent
+  nog steeds het hulp-overlay.
+
+## 0.41.0 — 2026-04-19
+
+- **"Files" header** above every folder view with pill-style counts per
+  file type (JPG, RAW, ARW, MOV, PDF, …). Counts are subtree-recursive
+  so a container folder's pills aggregate everything below it. Empty
+  types are hidden.
+- **Clickable pills filter the grid**: click "JPG" to only show JPGs,
+  click again (or "Toon alles") to clear. Foto's header reflects the
+  active filter ("Foto's (137 JPG)"). Filter resets when you navigate
+  to another folder.
+- Backend `/api/folder_stats?path=...` returns the breakdown via a
+  recursive CTE over the folder subtree.
+
 ## 0.40.0 — 2026-04-19
 
 - Fix "Geen thumb" overlay sticking on tiles whose thumbnail is actually

@@ -3,6 +3,7 @@ package frontend
 
 import (
 	"embed"
+	"io"
 	"io/fs"
 	"net/http"
 	"os"
@@ -52,4 +53,21 @@ func Handler() http.Handler {
 		r.URL.Path = "/"
 		fileSrv.ServeHTTP(w, r)
 	})
+}
+
+// IndexHTML returns the raw index.html used by the SPA. Useful for handlers
+// that need to serve a modified copy (e.g. injecting OpenGraph meta tags for
+// shared links) while still booting the same SvelteKit client bundle.
+func IndexHTML() (string, error) {
+	fsys := FS()
+	f, err := fsys.Open("/index.html")
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
