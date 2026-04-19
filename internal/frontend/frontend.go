@@ -31,9 +31,7 @@ func Handler() http.Handler {
 	fileSrv := http.FileServer(fsys)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Don't hijack API paths.
-		if strings.HasPrefix(r.URL.Path, "/api/") ||
-			strings.HasPrefix(r.URL.Path, "/healthz") ||
-			strings.HasPrefix(r.URL.Path, "/s/") {
+		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/healthz") {
 			http.NotFound(w, r)
 			return
 		}
