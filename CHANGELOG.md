@@ -2,6 +2,12 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.33.0 — 2026-04-19
+
+- Video thumbnail is now the middle frame instead of a fixed "3 seconds
+  in". ffprobe reports duration, we seek to `duration/2`, and fall back
+  to 3 s for clips with unknown/very short duration.
+
 ## 0.32.0 — 2026-04-19
 
 - Grid shows a "Thumb wordt gegenereerd…" overlay (with spinner) on

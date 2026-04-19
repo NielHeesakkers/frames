@@ -8,7 +8,7 @@ import (
 
 // Current is the human-readable version string. Bump by 0.1 per shipped change
 // (matches the entries in CHANGELOG.md).
-const Current = "0.32.0"
+const Current = "0.33.0"
 
 //go:embed changelog.md
 var rawChangelog string

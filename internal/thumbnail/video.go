@@ -13,8 +13,10 @@ import (
 	"time"
 )
 
-// GenerateVideoThumb extracts a frame at 3s (or 10% in, whichever is earlier)
-// and produces a WebP thumbnail with longest edge = size.
+// GenerateVideoThumb extracts the middle frame of the video (based on duration
+// from ffprobe) and produces a WebP thumbnail with longest edge = size.
+// Falls back to "3 seconds in" when the duration can't be read or the clip is
+// shorter than ~1 second.
 func GenerateVideoThumb(ctx context.Context, src, dst string, size int, quality int) error {
 	cctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
@@ -27,9 +29,19 @@ func GenerateVideoThumb(ctx context.Context, src, dst string, size int, quality 
 	_ = tmp.Close()
 	defer os.Remove(tmpPath)
 
-	// Extract a single frame to PNG.
+	// Pick the middle of the clip. For very short / unknown duration, fall
+	// back to 1 second (or 3 s for anything 6 s+).
+	seek := "3"
+	if durMs, derr := ProbeVideoDurationMs(cctx, src); derr == nil && durMs > 0 {
+		mid := float64(durMs) / 2000.0 // seconds
+		if mid < 0.5 {
+			mid = 0
+		}
+		seek = strconv.FormatFloat(mid, 'f', 2, 64)
+	}
+
 	ff := exec.CommandContext(cctx, "ffmpeg",
-		"-y", "-ss", "3",
+		"-y", "-ss", seek,
 		"-i", src,
 		"-frames:v", "1",
 		"-q:v", "2",
@@ -40,7 +52,6 @@ func GenerateVideoThumb(ctx context.Context, src, dst string, size int, quality 
 	if err := ff.Run(); err != nil {
 		return fmt.Errorf("ffmpeg: %w (stderr=%s)", err, stderr.String())
 	}
-	// Now resize+webp via vipsthumbnail.
 	return GenerateImageThumb(cctx, tmpPath, dst, size, quality)
 }
 
