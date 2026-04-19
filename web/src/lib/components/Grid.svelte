@@ -1,6 +1,5 @@
 <!-- web/src/lib/components/Grid.svelte -->
 <script lang="ts">
-  import { onMount } from 'svelte';
   import GridItem from './GridItem.svelte';
   import { density, sortMode, thumbShape } from '$lib/stores';
 
@@ -46,28 +45,10 @@
   const gap = 4;
   const padSide = 8; // matches grid padding
 
+  // Svelte's `bind:clientWidth` updates containerWidth whenever the element's
+  // rendered width changes (ResizeObserver under the hood). This is more
+  // reliable than a manual observer + window-resize combo.
   let containerWidth = 0;
-  let containerEl: HTMLDivElement;
-
-  function measure() {
-    if (containerEl) containerWidth = containerEl.clientWidth;
-  }
-
-  onMount(() => {
-    measure();
-    // ResizeObserver catches parent-layout changes (sidebar toggles, dialogs);
-    // a window-level resize listener is the safety net for browser width
-    // changes that don't always fan out to the observed node.
-    const ro = new ResizeObserver(measure);
-    if (containerEl) ro.observe(containerEl);
-    return () => ro.disconnect();
-  });
-
-  // Also remeasure on ANY file/thumb-shape change — the container may have
-  // just been mounted (switching from "square" to "original"), in which case
-  // clientWidth is already correct but `containerWidth` still holds the last
-  // value; forcing a read keeps the first paint right.
-  $: if (containerEl && (files || $thumbShape)) measure();
 
   type Sized = { file: any; h: number };
   function buildRows(list: any[], W: number, targetH: number): Sized[][] {
@@ -119,9 +100,7 @@
     : null;
 </script>
 
-<svelte:window on:resize={measure} />
-
-<div class="timeline" bind:this={containerEl} style="--size: {itemSize}px">
+<div class="timeline" bind:clientWidth={containerWidth} style="--size: {itemSize}px">
   {#if groups}
     {#each groups as g, gi (g.key)}
       <h4 class="month">{g.label} <span class="count">· {g.items.length}</span></h4>
@@ -159,8 +138,10 @@
 </div>
 
 <style>
-  .timeline { display: flex; flex-direction: column; overflow-y: auto; flex: 1;
-    content-visibility: auto; padding: 0 8px 14px; }
+  /* No inner overflow — the enclosing `.scroll` in BrowseView already scrolls
+     the page, preventing a double scrollbar. */
+  .timeline { display: flex; flex-direction: column;
+    content-visibility: auto; padding: 0 8px 14px; width: 100%; }
   .sq { display: grid; grid-template-columns: repeat(auto-fill, var(--size));
     gap: 4px; padding-bottom: 10px; }
   .jrow { display: flex; gap: 4px; margin-bottom: 4px; }

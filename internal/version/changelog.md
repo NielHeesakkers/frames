@@ -2,6 +2,13 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.28.0 — 2026-04-19
+
+- Grid width is now driven by `bind:clientWidth`, so the justified rows
+  layout recomputes reliably on browser resize, sidebar toggles, zoom,
+  and devtools open/close. Removed the Grid's inner `overflow-y: auto`
+  too so there's no double scrollbar — the outer page-scroll handles it.
+
 ## 0.27.0 — 2026-04-19
 
 - "Oorspronkelijke verhouding" grid now reflows on browser resize. Added
