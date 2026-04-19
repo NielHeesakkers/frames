@@ -23,3 +23,16 @@ func Open(dataDir string) (*DB, error) {
 	}
 	return &DB{d}, nil
 }
+
+// InTx runs fn inside a transaction, committing on success or rolling back on error.
+func (d *DB) InTx(fn func(tx *sql.Tx) error) error {
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	if err := fn(tx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
+}

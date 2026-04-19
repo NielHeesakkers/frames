@@ -56,6 +56,62 @@ func (d *DB) UpdateFileStat(id, mtime, size int64) error {
 	return err
 }
 
+// FileStatUpdate describes a single mtime/size update batched via BulkUpdateFileStats.
+type FileStatUpdate struct {
+	ID    int64
+	Mtime int64
+	Size  int64
+}
+
+// BulkInsertFiles inserts files in a single transaction using a prepared statement.
+func (d *DB) BulkInsertFiles(files []File) error {
+	if len(files) == 0 {
+		return nil
+	}
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(`INSERT INTO files(folder_id,filename,relative_path,size,mtime,mime_type,kind) VALUES(?,?,?,?,?,?,?)`)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+	for _, f := range files {
+		if _, err := stmt.Exec(f.FolderID, f.Filename, f.RelativePath, f.Size, f.Mtime, f.MimeType, f.Kind); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// BulkUpdateFileStats updates mtime/size (and resets thumb/preview state) for
+// many files in a single transaction using a prepared statement.
+func (d *DB) BulkUpdateFileStats(updates []FileStatUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(`UPDATE files SET mtime=?, size=?, thumb_status='pending', preview_status='pending', thumb_attempts=0, preview_attempts=0 WHERE id=?`)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+	for _, u := range updates {
+		if _, err := stmt.Exec(u.Mtime, u.Size, u.ID); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func (d *DB) UpdateFileMetadata(id int64, m MetadataUpdate) error {
 	_, err := d.Exec(`
 		UPDATE files SET

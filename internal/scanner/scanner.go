@@ -118,6 +118,8 @@ func (s *Scanner) handleDir(dir dirEntry, files []fileEntry, full bool, stats *S
 	}
 
 	keep := make([]string, 0, len(files))
+	var toInsert []db.File
+	var toUpdate []db.FileStatUpdate
 	for _, fe := range files {
 		stats.Scanned++
 		keep = append(keep, fe.Name)
@@ -125,22 +127,23 @@ func (s *Scanner) handleDir(dir dirEntry, files []fileEntry, full bool, stats *S
 		kind, mime := Classify(fe.Name)
 		rel := filepath.Join(dir.RelPath, fe.Name)
 		if !exists {
-			_, err := s.DB.InsertFile(db.File{
+			toInsert = append(toInsert, db.File{
 				FolderID: folderID, Filename: fe.Name, RelativePath: rel,
 				Size: fe.Size, Mtime: fe.Mtime, MimeType: mime, Kind: kind,
 			})
-			if err != nil {
-				return err
-			}
 			stats.Added++
 			continue
 		}
 		if old.Mtime != fe.Mtime || old.Size != fe.Size {
-			if err := s.DB.UpdateFileStat(old.ID, fe.Mtime, fe.Size); err != nil {
-				return err
-			}
+			toUpdate = append(toUpdate, db.FileStatUpdate{ID: old.ID, Mtime: fe.Mtime, Size: fe.Size})
 			stats.Updated++
 		}
+	}
+	if err := s.DB.BulkInsertFiles(toInsert); err != nil {
+		return err
+	}
+	if err := s.DB.BulkUpdateFileStats(toUpdate); err != nil {
+		return err
 	}
 	// Remove rows for files no longer present.
 	keepSet := make(map[string]struct{}, len(keep))
