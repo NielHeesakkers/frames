@@ -45,6 +45,14 @@ func run() error {
 		return err
 	}
 
+	created, err := auth.BootstrapAdmin(database, cfg.AdminUsername, cfg.AdminPassword)
+	if err != nil {
+		return fmt.Errorf("bootstrap admin: %w", err)
+	}
+	if created {
+		log.Info("admin user created", "username", cfg.AdminUsername)
+	}
+
 	lim := auth.NewLoginLimiter(5, 15*time.Minute)
 	h := api.NewRouter(api.Deps{
 		Log: log, DB: database, Limiter: lim,
