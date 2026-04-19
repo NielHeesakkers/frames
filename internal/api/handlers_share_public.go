@@ -212,3 +212,26 @@ func (psh *publicShareDeps) handleFileMedia(kind string) http.HandlerFunc {
 		}
 	}
 }
+
+func (psh *publicShareDeps) handleZip(w http.ResponseWriter, r *http.Request) {
+	s, code := psh.load(r)
+	if code != 0 {
+		WriteError(w, code, http.StatusText(code))
+		return
+	}
+	if !s.AllowDownload {
+		WriteError(w, http.StatusForbidden, "download disabled")
+		return
+	}
+	folder, _ := psh.DB.FolderByID(s.FolderID)
+	w.Header().Set("Content-Type", "application/zip")
+	name := folder.Name
+	if name == "" {
+		name = "frames"
+	}
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`.zip"`)
+	if err := share.StreamFolderZip(w, psh.DB, psh.Root, folder.Path); err != nil {
+		// Can't change status at this point; just log.
+		_ = err
+	}
+}

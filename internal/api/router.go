@@ -116,6 +116,7 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/{token}/thumb/{id}", psh.handleFileMedia("thumb"))
 		r.Get("/{token}/preview/{id}", psh.handleFileMedia("preview"))
 		r.Get("/{token}/original/{id}", psh.handleFileMedia("original"))
+		r.Get("/{token}/zip", psh.handleZip)
 	})
 
 	return r
