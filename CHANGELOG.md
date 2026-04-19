@@ -2,6 +2,14 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.21.0 — 2026-04-19
+
+- Rating on hover: hovering a thumbnail in the grid reveals a 5-star row
+  along the bottom — click to rate without opening the lightbox.
+  Keyboard shortcuts 0–5 also work while hovering. Existing ratings stay
+  visible as filled stars; rating a zero-rated item keeps the overlay
+  only while the mouse is over the thumb.
+
 ## 0.20.0 — 2026-04-19
 
 - **Timeline headers in the grid** when sorted by capture date: sticky
