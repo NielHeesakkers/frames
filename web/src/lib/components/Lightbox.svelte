@@ -19,11 +19,18 @@
   }
   onMount(() => window.addEventListener('keydown', onKey));
   onDestroy(() => window.removeEventListener('keydown', onKey));
+
+  let touchStart = 0;
+  function onTouchStart(e: TouchEvent) { touchStart = e.touches[0].clientX; }
+  function onTouchEnd(e: TouchEvent) {
+    const dx = e.changedTouches[0].clientX - touchStart;
+    if (Math.abs(dx) > 60) dx > 0 ? prev() : next();
+  }
 </script>
 
 <div class="lightbox" on:click={close}>
   <button class="nav left" on:click|stopPropagation={prev} disabled={index <= 0}>‹</button>
-  <div class="media" on:click|stopPropagation>
+  <div class="media" on:click|stopPropagation on:touchstart={onTouchStart} on:touchend={onTouchEnd}>
     {#if file.kind === 'video'}
       <video src={`/api/original/${file.id}`} controls autoplay></video>
     {:else if file.kind === 'other'}

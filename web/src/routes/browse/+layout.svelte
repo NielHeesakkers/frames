@@ -7,6 +7,8 @@
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
   import SearchBox from '$lib/components/SearchBox.svelte';
 
+  let sidebarOpen = false;
+
   onMount(async () => {
     const u = await refreshMe();
     if (!u) goto('/login');
@@ -14,8 +16,9 @@
 </script>
 
 {#if $me}
+  <button class="menu-btn" on:click={() => (sidebarOpen = !sidebarOpen)}>☰</button>
   <div class="shell">
-    <aside>
+    <aside class:open={sidebarOpen}>
       <div class="brand">Frames</div>
       <FolderTree />
       <div class="sidebar-footer">
@@ -48,8 +51,13 @@
   main { display: flex; flex-direction: column; min-height: 0; }
   header { border-bottom: 1px solid var(--border); padding: 10px 16px; }
   .main-inner { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+  .menu-btn { display: none; position: fixed; top: 8px; left: 8px; z-index: 20;
+    background: var(--bg-2); border: 1px solid var(--border); padding: 6px 10px; }
   @media (max-width: 768px) {
     .shell { grid-template-columns: 1fr; }
-    aside { display: none; }
+    .menu-btn { display: block; }
+    aside { display: flex; position: fixed; inset: 0 40% 0 0; transform: translateX(-100%);
+      transition: transform 0.2s; z-index: 15; }
+    aside.open { transform: translateX(0); }
   }
 </style>
