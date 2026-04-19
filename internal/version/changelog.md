@@ -2,6 +2,12 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.2.0 — 2026-04-19
+
+- Inside a folder, show a "Foto's (n)" heading above the grid and an
+  explicit empty-state hint when the folder has no direct files. Prevents
+  the "only subfolders, nothing else visible" confusion at a glance.
+
 ## 0.1.0 — 2026-04-19
 
 Initial working release deployed to the Mac Mini M4.
