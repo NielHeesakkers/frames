@@ -1,11 +1,15 @@
 services:
   frames:
+    # Primary: pull a pre-built image from GHCR (built by .github/workflows/docker.yml).
+    # You can also build locally with `docker compose build` or `docker compose up --build`.
+    image: ghcr.io/nielheesakkers/frames:latest
     build: .
+    pull_policy: always
     container_name: frames
     ports:
       - "8080:8080"
     volumes:
-      - ./photos:/photos:rw
+      - ${FRAMES_PHOTOS_HOST_PATH:-./photos}:/photos:rw
       - frames_cache:/cache
       - frames_data:/data
     environment:
@@ -17,6 +21,7 @@ services:
       FRAMES_PUBLIC_URL: ${FRAMES_PUBLIC_URL:-http://localhost:8080}
       FRAMES_ADMIN_USERNAME: ${FRAMES_ADMIN_USERNAME:-admin}
       FRAMES_ADMIN_PASSWORD: ${FRAMES_ADMIN_PASSWORD:-change-me}
+      FRAMES_TRUST_PROXY: ${FRAMES_TRUST_PROXY:-0}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]

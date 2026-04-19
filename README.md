@@ -2,21 +2,39 @@
 
 Self-hosted media library with a web frontend over an existing Finder folder structure.
 
-## Quick start
+## Quick start (local Docker)
 
 ```bash
 git clone https://github.com/NielHeesakkers/frames && cd frames
 
-export FRAMES_SESSION_SECRET=$(head -c 32 /dev/urandom | base64)
-export FRAMES_PUBLIC_URL=http://localhost:8080
-export FRAMES_ADMIN_USERNAME=niel
-export FRAMES_ADMIN_PASSWORD='pick-something-strong'
+cp .env.example .env
+# Edit .env and fill in real values. At minimum:
+#   FRAMES_SESSION_SECRET=$(openssl rand -base64 32)
+#   FRAMES_ADMIN_PASSWORD=<something strong>
+#   FRAMES_PHOTOS_HOST_PATH=/absolute/path/to/your/photos    # optional; defaults to ./photos
 
-mkdir -p photos
-docker compose up --build
+docker compose --env-file .env up -d
 ```
 
-Open http://localhost:8080 and log in.
+Open http://localhost:8080 and log in with the admin credentials from `.env`.
+
+`docker compose up` pulls the pre-built image from `ghcr.io/nielheesakkers/frames:latest`. To build locally from source instead:
+
+```bash
+docker compose build && docker compose up -d
+```
+
+## Deploying with Portainer (or any Docker host)
+
+The published image at `ghcr.io/nielheesakkers/frames:latest` means Portainer can deploy without access to the source code.
+
+1. **GHCR access**: the package is private by default because the repo is private. Two options:
+   - **Make the package public** (Go to https://github.com/users/NielHeesakkers/packages/container/frames → Package settings → "Change package visibility" → Public). The image is fine to publish publicly even while the repo stays private.
+   - **Keep it private and add registry credentials** in Portainer (Registries → Add registry → GHCR, username=your GitHub handle, password=a PAT with `read:packages`).
+2. In Portainer: **Stacks → Add stack → Web editor** (not Git repo — the image is self-contained now). Paste the `docker-compose.yml` and edit:
+   - `FRAMES_PHOTOS_HOST_PATH` → absolute path on the Portainer host (e.g. `/mnt/photos`)
+   - All `FRAMES_*` env vars — set real values
+3. Deploy.
 
 ## Volumes
 
@@ -36,17 +54,17 @@ frames.example.com {
 }
 ```
 
-Set `FRAMES_PUBLIC_URL=https://frames.example.com` so share-link URLs are correct.
+Set `FRAMES_PUBLIC_URL=https://frames.example.com` so share-link URLs are correct. If the proxy is on the same Docker network, also set `FRAMES_TRUST_PROXY=1` so per-IP rate limits see the real client IP.
 
 ## Environment variables
 
-See [`docs/superpowers/specs/2026-04-18-frames-design.md`](docs/superpowers/specs/2026-04-18-frames-design.md) §10.
+See `.env.example` for the full list. Details in [`docs/superpowers/specs/2026-04-18-frames-design.md`](docs/superpowers/specs/2026-04-18-frames-design.md) §10.
 
 ## Development
 
 ```bash
 make build    # build binary
-make test     # run all tests
+make test     # run all Go tests
 make web      # build frontend into internal/frontend/dist
 make run      # start binary (expects env vars)
 ```
