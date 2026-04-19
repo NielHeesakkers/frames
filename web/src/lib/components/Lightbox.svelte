@@ -251,10 +251,13 @@
   .nav:not(:disabled):hover { color: var(--accent); }
 
   .media { grid-column: 2; grid-row: 1;
-    display: grid; place-items: center; padding: 20px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
     min-width: 0; min-height: 0; overflow: hidden; position: relative; }
-  .media img, .media video { max-width: 100%; max-height: 100%; object-fit: contain;
-    display: block; transition: transform 0.08s linear; user-select: none; }
+  .media img, .media video { max-width: 100%; max-height: 100%;
+    width: auto; height: auto; object-fit: contain;
+    display: block; margin: auto;
+    transition: transform 0.08s linear; user-select: none; }
   .download-fallback { color: var(--accent); font-size: 18px; }
 
   .zoom-badge { position: absolute; top: 12px; left: 12px;

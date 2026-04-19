@@ -2,6 +2,10 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.22.0 — 2026-04-19
+
+- Lightbox photo vertically centered via explicit flex centering.
+
 ## 0.21.0 — 2026-04-19
 
 - Rating on hover: hovering a thumbnail in the grid reveals a 5-star row
