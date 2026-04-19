@@ -19,6 +19,9 @@
       <FolderTree />
       <div class="sidebar-footer">
         <span>{$me.username}</span>
+        <a href="/shares">Shares</a>
+        <a href="/settings">Settings</a>
+        {#if $me?.is_admin}<a href="/admin">Admin</a>{/if}
         <button on:click={async () => { await logout(); goto('/login'); }}>Logout</button>
       </div>
     </aside>
