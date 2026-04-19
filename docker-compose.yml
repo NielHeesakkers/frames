@@ -1,0 +1,29 @@
+services:
+  frames:
+    build: .
+    container_name: frames
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./photos:/photos:rw
+      - frames_cache:/cache
+      - frames_data:/data
+    environment:
+      FRAMES_BIND: ":8080"
+      FRAMES_PHOTOS_ROOT: /photos
+      FRAMES_CACHE_DIR: /cache
+      FRAMES_DATA_DIR: /data
+      FRAMES_SESSION_SECRET: ${FRAMES_SESSION_SECRET:-change-me-32-bytes-minimum-xxxxxxx}
+      FRAMES_PUBLIC_URL: ${FRAMES_PUBLIC_URL:-http://localhost:8080}
+      FRAMES_ADMIN_USERNAME: ${FRAMES_ADMIN_USERNAME:-admin}
+      FRAMES_ADMIN_PASSWORD: ${FRAMES_ADMIN_PASSWORD:-change-me}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  frames_cache:
+  frames_data:

@@ -1,0 +1,12 @@
+/.git
+/.idea
+/.vscode
+/.superpowers
+/data
+/cache
+/photos
+/web/node_modules
+/web/.svelte-kit
+/web/build
+/internal/frontend/dist
+*.db*

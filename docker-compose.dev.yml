@@ -1,0 +1,17 @@
+services:
+  frames:
+    build:
+      context: .
+      target: build
+    command: ["sh", "-c", "go run ./cmd/frames"]
+    volumes:
+      - .:/src
+    working_dir: /src
+    ports:
+      - "8080:8080"
+    environment:
+      FRAMES_SESSION_SECRET: dev-secret-not-for-prod
+      FRAMES_PUBLIC_URL: http://localhost:8080
+      FRAMES_PHOTOS_ROOT: /src/photos
+      FRAMES_CACHE_DIR: /src/cache
+      FRAMES_DATA_DIR: /src/data
