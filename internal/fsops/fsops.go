@@ -13,8 +13,11 @@ import (
 )
 
 type Ops struct {
-	DB   *db.DB
-	Root string
+	DB    *db.DB
+	Root  string
+	Cache interface {
+		RemoveDerivatives(id int64)
+	}
 }
 
 func (o *Ops) Mkdir(relPath string) error {
@@ -116,7 +119,13 @@ func (o *Ops) DeleteFile(id int64) error {
 	if err := os.Remove(abs); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	return o.DB.DeleteFile(id)
+	if err := o.DB.DeleteFile(id); err != nil {
+		return err
+	}
+	if o.Cache != nil {
+		o.Cache.RemoveDerivatives(id)
+	}
+	return nil
 }
 
 func (o *Ops) DeleteFolder(id int64) error {
@@ -134,7 +143,29 @@ func (o *Ops) DeleteFolder(id int64) error {
 	if err := os.RemoveAll(abs); err != nil {
 		return err
 	}
-	return o.DB.DeleteFolder(id)
+	// Collect child file IDs before cascading delete so we can scrub cache.
+	var childIDs []int64
+	if rows, err := o.DB.Query(
+		`SELECT id FROM files WHERE folder_id = ? OR relative_path LIKE ?`,
+		id, f.Path+"/%",
+	); err == nil {
+		for rows.Next() {
+			var fid int64
+			if err := rows.Scan(&fid); err == nil {
+				childIDs = append(childIDs, fid)
+			}
+		}
+		rows.Close()
+	}
+	if err := o.DB.DeleteFolder(id); err != nil {
+		return err
+	}
+	if o.Cache != nil {
+		for _, cid := range childIDs {
+			o.Cache.RemoveDerivatives(cid)
+		}
+	}
+	return nil
 }
 
 func (o *Ops) RenameFolder(id int64, newName string) error {

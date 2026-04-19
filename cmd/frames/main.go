@@ -80,7 +80,7 @@ func run() error {
 	}
 	pool.Start(ctx)
 
-	ops := &fsops.Ops{DB: database, Root: cfg.PhotosRoot}
+	ops := &fsops.Ops{DB: database, Root: cfg.PhotosRoot, Cache: cache}
 
 	lim := auth.NewLoginLimiter(5, 15*time.Minute)
 	h := api.NewRouter(api.Deps{
