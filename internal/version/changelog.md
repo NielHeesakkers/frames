@@ -2,6 +2,15 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.32.0 — 2026-04-19
+
+- Grid shows a "Thumb wordt gegenereerd…" overlay (with spinner) on
+  thumbnails that aren't ready yet. When the backend returns 202 while
+  the worker generates, the frontend retries automatically with back-off
+  and clears the overlay once the img loads. Hovering a pending tile
+  calls the thumb endpoint once more to boost that file into the
+  foreground queue server-side. Failed thumbs show "Geen thumb".
+
 ## 0.31.0 — 2026-04-19
 
 - Fix stale thumbnails after "Reset library". SQLite recycles low file

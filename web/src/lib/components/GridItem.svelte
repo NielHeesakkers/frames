@@ -1,7 +1,7 @@
 <!-- web/src/lib/components/GridItem.svelte -->
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onDestroy } from 'svelte';
   import { api } from '$lib/api';
   import { selection, thumbShape } from '$lib/stores';
   import StarRating from './StarRating.svelte';
@@ -47,6 +47,49 @@
     }
   }
 
+  // Thumb generation state. `pending` starts true if the backend reported
+  // status != 'ready'. When the img successfully loads we flip it off; on
+  // load errors we retry after a delay (backend returns 202 while generating).
+  $: initialReady = file.thumb_status === 'ready';
+  let pending = !initialReady;
+  let failed = file.thumb_status === 'failed';
+  let retries = 0;
+  let retryTimer: any = null;
+  let imgCacheKey = Date.now();
+
+  $: thumbSrc = `/api/thumb/${file.id}?v=${file.mtime ?? 0}&k=${imgCacheKey}`;
+
+  function onThumbLoad() {
+    pending = false;
+    failed = false;
+    retries = 0;
+  }
+  function onThumbError() {
+    if (retries < 30 && !failed) {
+      retries++;
+      pending = true;
+      // Back off: 1.2s, 2.4s, 3.6s, …
+      const delay = Math.min(6000, 1200 * retries);
+      retryTimer = setTimeout(() => { imgCacheKey = Date.now(); }, delay);
+    } else {
+      failed = true;
+    }
+  }
+  // On hover — force-generate by hitting the endpoint, which boosts the
+  // file into the foreground thumbnail queue server-side.
+  async function forceThumb() {
+    if (!pending) return;
+    try {
+      await fetch(`/api/thumb/${file.id}?force=${Date.now()}`, { credentials: 'include' });
+    } catch {}
+    // Trigger an img reload in case the thumb is now ready.
+    imgCacheKey = Date.now();
+  }
+
+  $: if (hovering && pending) forceThumb();
+
+  onDestroy(() => { if (retryTimer) clearTimeout(retryTimer); });
+
   function formatSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -81,10 +124,23 @@
            poster={`/api/thumb/${file.id}`}
            muted autoplay loop playsinline></video>
   {:else}
-    <img src={`/api/thumb/${file.id}?v=${file.mtime ?? 0}`} loading="lazy" alt={file.name} />
+    <img src={thumbSrc}
+         loading="lazy" alt={file.name}
+         on:load={onThumbLoad} on:error={onThumbError} />
   {/if}
 
   {#if file.kind === 'video'}<span class="badge">▶</span>{/if}
+
+  {#if pending && !failed}
+    <div class="gen-overlay">
+      <div class="spinner" />
+      <span>Thumb wordt gegenereerd…</span>
+    </div>
+  {:else if failed}
+    <div class="gen-overlay error">
+      <span>Geen thumb</span>
+    </div>
+  {/if}
 
   {#if hovering}
     <div class="meta">
@@ -122,6 +178,17 @@
   .meta .name { font-weight: 500; white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis; margin-bottom: 2px; }
   .meta .row { display: flex; gap: 8px; color: rgba(255,255,255,0.8); font-size: 10px; }
+
+  .gen-overlay { position: absolute; inset: 0;
+    background: rgba(0,0,0,0.55); color: var(--fg-dim);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; font-size: 11px; text-align: center; padding: 10px;
+    pointer-events: none; }
+  .gen-overlay.error { color: var(--danger); background: rgba(0,0,0,0.7); }
+  .spinner { width: 22px; height: 22px; border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   .rating-overlay { position: absolute; left: 0; right: 0; bottom: 0;
     padding: 14px 6px 4px;
