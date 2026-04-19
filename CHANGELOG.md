@@ -2,6 +2,13 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.36.0 — 2026-04-19
+
+- DB migration `0005_fix_rotated_dims.sql` backfills width/height for
+  photos that were stored with raw-sensor dims + a rotated EXIF
+  orientation. No more "everything looks landscape" — fix applies on
+  first boot after deploy, no Clear-cache needed.
+
 ## 0.35.0 — 2026-04-19
 
 - Slideshow removed (play/pause button, interval selector, spacebar
