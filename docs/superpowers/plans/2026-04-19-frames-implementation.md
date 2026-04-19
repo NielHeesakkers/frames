@@ -1030,7 +1030,7 @@ git commit -m "feat(api): minimal http server with healthz and graceful shutdown
 ```dockerfile
 # syntax=docker/dockerfile:1.7
 
-FROM golang:1.22-alpine AS build
+FROM golang:1.26-alpine AS build
 WORKDIR /src
 RUN apk add --no-cache build-base
 COPY go.mod go.sum ./
@@ -9640,7 +9640,7 @@ COPY web/ ./
 RUN (pnpm build 2>/dev/null || npm run build)
 
 # ---------- Stage 2: backend build ----------
-FROM golang:1.22-alpine AS build
+FROM golang:1.26-alpine AS build
 WORKDIR /src
 RUN apk add --no-cache build-base
 COPY go.mod go.sum ./
