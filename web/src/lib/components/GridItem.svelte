@@ -47,46 +47,47 @@
     }
   }
 
-  // Thumb generation state. `pending` starts true if the backend reported
-  // status != 'ready'. When the img successfully loads we flip it off; on
-  // load errors we retry after a delay (backend returns 202 while generating).
-  $: initialReady = file.thumb_status === 'ready';
-  let pending = !initialReady;
-  let failed = file.thumb_status === 'failed';
-  let retries = 0;
+  // Thumb generation state. The ONLY source of truth here is whether the
+  // img element actually successfully loaded. The DB's thumb_status is a
+  // hint (to set sensible first-render state), but once the browser gets
+  // the image we clear any overlay regardless of what the DB said.
+  let imgLoaded = false;
+  let imgRetries = 0;
   let retryTimer: any = null;
   let imgCacheKey = Date.now();
 
   $: thumbSrc = `/api/thumb/${file.id}?v=${file.mtime ?? 0}&k=${imgCacheKey}`;
 
+  // Overlay visibility: derived purely from what the <img> has actually
+  // told us. The DB's thumb_status is *not* read here — it can be stale
+  // (worker regenerated, DB row not yet updated on this page's snapshot),
+  // and we'd rather trust the one signal that's always current: did the
+  // browser just successfully paint an image or not.
+  $: pending = !imgLoaded && imgRetries < 30;
+  $: failed  = !imgLoaded && imgRetries >= 30;
+
   function onThumbLoad() {
-    pending = false;
-    failed = false;
-    retries = 0;
+    imgLoaded = true;
+    imgRetries = 0;
   }
   function onThumbError() {
-    if (retries < 30 && !failed) {
-      retries++;
-      pending = true;
-      // Back off: 1.2s, 2.4s, 3.6s, …
-      const delay = Math.min(6000, 1200 * retries);
-      retryTimer = setTimeout(() => { imgCacheKey = Date.now(); }, delay);
-    } else {
-      failed = true;
+    imgLoaded = false;
+    if (imgRetries < 30) {
+      imgRetries++;
+      const delay = Math.min(6000, 1200 * imgRetries);
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => { retryTimer = null; imgCacheKey = Date.now(); }, delay);
     }
   }
-  // On hover — force-generate by hitting the endpoint, which boosts the
-  // file into the foreground thumbnail queue server-side.
   async function forceThumb() {
-    if (!pending) return;
+    if (imgLoaded) return;
     try {
       await fetch(`/api/thumb/${file.id}?force=${Date.now()}`, { credentials: 'include' });
     } catch {}
-    // Trigger an img reload in case the thumb is now ready.
     imgCacheKey = Date.now();
   }
 
-  $: if (hovering && pending) forceThumb();
+  $: if (hovering && !imgLoaded) forceThumb();
 
   onDestroy(() => { if (retryTimer) clearTimeout(retryTimer); });
 

@@ -2,6 +2,14 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.40.0 — 2026-04-19
+
+- Fix "Geen thumb" overlay sticking on tiles whose thumbnail is actually
+  fine. The overlay now derives purely from whether the `<img>` has
+  successfully loaded (or exhausted 30 retries) — not from a possibly
+  stale `thumb_status` in the database. Items that were flagged failed
+  in the DB but have a valid thumb on disk now render cleanly.
+
 ## 0.39.0 — 2026-04-19
 
 - **Orphan-folder GC is now safe against a dropped SMB share.** Two
