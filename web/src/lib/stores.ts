@@ -23,7 +23,7 @@ export async function logout() {
 
 export const currentFolderPath = writable<string>('');
 export const selection = writable<Set<number>>(new Set());
-export const sortMode = writable<'takenAt' | 'name' | 'size'>('takenAt');
+export const sortMode = writable<'takenAt' | 'name' | 'size' | 'rating'>('takenAt');
 export const density = writable<'small' | 'medium' | 'large'>('medium');
 
 /**

@@ -54,6 +54,7 @@ func (sd *searchDeps) handleSearch(w http.ResponseWriter, r *http.Request) {
 			MimeType: fl.MimeType, Mtime: fl.Mtime, TakenAt: takenStr,
 			Width: fl.Width, Height: fl.Height,
 			ThumbStatus: fl.ThumbStatus, PreviewStatus: fl.PreviewStatus,
+			Rating: fl.Rating,
 		})
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{

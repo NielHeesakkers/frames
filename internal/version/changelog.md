@@ -2,6 +2,21 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.20.0 — 2026-04-19
+
+- **Timeline headers in the grid** when sorted by capture date: sticky
+  `Augustus 2024` labels between months. Groups come from the files'
+  `taken_at` on the client, so no extra backend roundtrips.
+- **Zoom + pan in the lightbox**: Ctrl/⌘ + scroll zooms, drag to pan
+  when zoomed, `+` / `-` / `0` keys, double-click to toggle 2×, zoom
+  percentage badge with a reset button. Touch-swipe still works at 1×.
+- **Filmstrip** at the bottom of the lightbox showing neighbor thumbs,
+  highlighted + auto-scrolled to the active file. Click a thumb to jump.
+- **Star ratings 0–5** per file. Click in the lightbox rating row; the
+  grid shows filled stars on the bottom-left corner of thumbs. New sort
+  option "Op rating" in the toolbar. DB migration `0002_ratings.sql`
+  adds an indexed `rating` column.
+
 ## 0.19.0 — 2026-04-19
 
 - New admin "Onderhoud" section with two maintenance actions:

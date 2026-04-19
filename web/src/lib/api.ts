@@ -52,6 +52,8 @@ export const api = {
     req<Array<{ id: number; path: string; name: string; has_child: boolean; items: number }>>(
       'GET', `/api/tree${parent ? `?parent=${encodeURIComponent(parent)}` : ''}`),
   file: (id: number) => req<any>('GET', `/api/file/${id}`),
+  setRating: (id: number, rating: number) =>
+    req<void>('POST', `/api/file/${id}/rating`, { rating }),
   search: (q: Record<string, string>) =>
     req<{ files: any[]; has_more: boolean }>('GET', '/api/search?' + new URLSearchParams(q)),
 

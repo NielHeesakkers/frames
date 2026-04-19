@@ -72,6 +72,7 @@ func NewRouter(d Deps) http.Handler {
 			r.Get("/folder/*", bd.handleFolder)
 			r.Get("/tree", bd.handleTree)
 			r.Get("/file/{id}", bd.handleFile)
+			r.Post("/file/{id}/rating", bd.handleSetRating)
 
 			srd := &searchDeps{DB: d.DB}
 			r.Get("/search", srd.handleSearch)

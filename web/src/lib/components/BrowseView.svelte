@@ -39,7 +39,7 @@
 
   async function load() {
     loading = true;
-    const sort = $sortMode === 'takenAt' ? 'taken' : $sortMode;
+    const sort = $sortMode === 'takenAt' ? 'taken' : $sortMode;  // backend expects taken|name|size|rating
     try {
       const r = await api.folder(path, { sort, limit: 50000 });
       folder = r.folder;
@@ -126,9 +126,10 @@
      on:drop={onDrop}>
   <div class="toolbar">
     <select bind:value={$sortMode}>
-      <option value="takenAt">By capture date</option>
-      <option value="name">By name</option>
-      <option value="size">By size</option>
+      <option value="takenAt">Op opnamedatum</option>
+      <option value="rating">Op rating</option>
+      <option value="name">Op naam</option>
+      <option value="size">Op grootte</option>
     </select>
     <select bind:value={$density}>
       <option value="small">S</option><option value="medium">M</option><option value="large">L</option>

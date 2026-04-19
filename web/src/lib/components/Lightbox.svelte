@@ -1,10 +1,22 @@
 <!-- web/src/lib/components/Lightbox.svelte -->
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
+  import { api } from '$lib/api';
+  import StarRating from './StarRating.svelte';
 
   export let file: any;
   export let neighbors: number[] = [];
+
+  async function onRatingChange(n: number) {
+    const prev = file.rating ?? 0;
+    file = { ...file, rating: n };
+    try {
+      await api.setRating(file.id, n);
+    } catch {
+      file = { ...file, rating: prev };
+    }
+  }
 
   // Recompute index reactively so navigation + re-renders stay in sync.
   $: index = neighbors.indexOf(file.id);
@@ -12,8 +24,6 @@
   $: hasNext = index >= 0 && index < neighbors.length - 1;
 
   function close() {
-    // Go to the containing folder. history.back() would walk back through
-    // every photo you visited with ← → instead of actually closing.
     const rel = (file?.relative_path ?? '') as string;
     const parent = rel.split('/').slice(0, -1).join('/');
     if (parent) {
@@ -29,16 +39,61 @@
     if (e.key === 'Escape') close();
     else if (e.key === 'ArrowLeft') prev();
     else if (e.key === 'ArrowRight') next();
+    else if (e.key === '+' || e.key === '=') setZoom(zoom * 1.25);
+    else if (e.key === '-' || e.key === '_') setZoom(zoom / 1.25);
+    else if (e.key === '0') resetZoom();
   }
   onMount(() => window.addEventListener('keydown', onKey));
   onDestroy(() => window.removeEventListener('keydown', onKey));
 
+  // Touch swipe
   let touchStart = 0;
   function onTouchStart(e: TouchEvent) { touchStart = e.touches[0].clientX; }
   function onTouchEnd(e: TouchEvent) {
+    if (zoom !== 1) return; // swipe conflicts with pan when zoomed
     const dx = e.changedTouches[0].clientX - touchStart;
     if (Math.abs(dx) > 60) dx > 0 ? prev() : next();
   }
+
+  // Zoom + pan state.
+  let zoom = 1;
+  let panX = 0;
+  let panY = 0;
+  let panning = false;
+  let panStartX = 0;
+  let panStartY = 0;
+  let panOrigX = 0;
+  let panOrigY = 0;
+
+  function setZoom(z: number) {
+    zoom = Math.min(8, Math.max(1, z));
+    if (zoom === 1) { panX = 0; panY = 0; }
+  }
+  function resetZoom() { zoom = 1; panX = 0; panY = 0; }
+
+  function onWheel(e: WheelEvent) {
+    if (!e.ctrlKey && !e.metaKey) {
+      // Plain scroll — let the browser pass through. Users hold ⌘ or Ctrl to zoom.
+      return;
+    }
+    e.preventDefault();
+    const factor = Math.exp(-e.deltaY * 0.002);
+    setZoom(zoom * factor);
+  }
+
+  function onMouseDown(e: MouseEvent) {
+    if (zoom === 1) return;
+    e.preventDefault();
+    panning = true;
+    panStartX = e.clientX; panStartY = e.clientY;
+    panOrigX = panX; panOrigY = panY;
+  }
+  function onMouseMove(e: MouseEvent) {
+    if (!panning) return;
+    panX = panOrigX + (e.clientX - panStartX);
+    panY = panOrigY + (e.clientY - panStartY);
+  }
+  function onMouseUp() { panning = false; }
 
   function formatSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
@@ -46,20 +101,46 @@
     if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
     return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
   }
+
+  // Reset zoom on every navigation.
+  $: if (file) { zoom = 1; panX = 0; panY = 0; }
+
+  // Scroll the filmstrip so the active thumb is visible.
+  let stripEl: HTMLDivElement | null = null;
+  $: if (stripEl && index >= 0) {
+    tick().then(() => {
+      const activeEl = stripEl?.querySelector('.strip-thumb.active') as HTMLElement | null;
+      if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    });
+  }
 </script>
+
+<svelte:window on:mousemove={onMouseMove} on:mouseup={onMouseUp} />
 
 <div class="lightbox">
   <button class="close" on:click={close} title="Sluiten (Esc)">✕</button>
 
   <button class="nav left" on:click={prev} disabled={!hasPrev} title="Vorige (←)">‹</button>
 
-  <div class="media" on:touchstart={onTouchStart} on:touchend={onTouchEnd}>
+  <div class="media"
+       on:touchstart={onTouchStart} on:touchend={onTouchEnd}
+       on:wheel|nonpassive={onWheel}>
     {#if file.kind === 'video'}
       <video src={`/api/original/${file.id}`} controls autoplay></video>
     {:else if file.kind === 'other'}
       <a class="download-fallback" href={`/api/original/${file.id}`}>Download {file.name}</a>
     {:else}
-      <img src={`/api/preview/${file.id}`} alt={file.name} />
+      <img src={`/api/preview/${file.id}`} alt={file.name}
+           style="transform: translate({panX}px, {panY}px) scale({zoom}); cursor: {zoom > 1 ? (panning ? 'grabbing' : 'grab') : 'zoom-in'}"
+           on:mousedown={onMouseDown}
+           on:dblclick={() => (zoom === 1 ? setZoom(2) : resetZoom())}
+           draggable="false" />
+    {/if}
+
+    {#if zoom !== 1}
+      <div class="zoom-badge">{Math.round(zoom * 100)}%
+        <button on:click={resetZoom} title="Reset zoom (0)">reset</button>
+      </div>
     {/if}
   </div>
 
@@ -70,6 +151,11 @@
     {#if neighbors.length > 0 && index >= 0}
       <p class="position">{index + 1} van {neighbors.length}</p>
     {/if}
+
+    <div class="rating-row">
+      <span class="rating-label">Rating</span>
+      <StarRating value={file.rating ?? 0} onChange={onRatingChange} size={20} />
+    </div>
 
     <dl>
       {#if file.exif?.taken_at}
@@ -130,13 +216,23 @@
 
     <a class="dl" href={`/api/original/${file.id}`} download={file.name}>Download origineel</a>
   </aside>
+
+  {#if neighbors.length > 1}
+    <div class="filmstrip" bind:this={stripEl}>
+      {#each neighbors as id, i (id)}
+        <a class="strip-thumb" class:active={i === index} href={`/file/${id}`}>
+          <img src={`/api/thumb/${id}`} alt="" loading="lazy" />
+        </a>
+      {/each}
+    </div>
+  {/if}
 </div>
 
 <style>
   .lightbox { position: fixed; inset: 0; background: #000;
     display: grid;
     grid-template-columns: 60px 1fr 60px 340px;
-    grid-template-rows: 1fr;
+    grid-template-rows: 1fr 84px;
     z-index: 1000; }
 
   .close { position: absolute; top: 12px; right: 360px; z-index: 110;
@@ -156,16 +252,26 @@
 
   .media { grid-column: 2; grid-row: 1;
     display: grid; place-items: center; padding: 20px;
-    min-width: 0; min-height: 0; overflow: hidden; }
+    min-width: 0; min-height: 0; overflow: hidden; position: relative; }
   .media img, .media video { max-width: 100%; max-height: 100%; object-fit: contain;
-    display: block; }
+    display: block; transition: transform 0.08s linear; user-select: none; }
   .download-fallback { color: var(--accent); font-size: 18px; }
+
+  .zoom-badge { position: absolute; top: 12px; left: 12px;
+    background: rgba(0,0,0,0.6); color: #fff; padding: 5px 10px;
+    border-radius: var(--radius); font-size: 12px;
+    display: flex; align-items: center; gap: 8px; }
+  .zoom-badge button { background: transparent; border: 1px solid rgba(255,255,255,0.3);
+    color: #fff; padding: 1px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; }
 
   .info { grid-column: 4; grid-row: 1;
     background: var(--bg-2); padding: 52px 22px 22px; overflow-y: auto;
     border-left: 1px solid var(--border); min-width: 0; }
   .info h3 { margin: 0 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .position { color: var(--fg-dim); font-size: 12px; margin: 0 0 14px; }
+  .rating-row { display: flex; align-items: center; gap: 10px; margin: 0 0 16px;
+    padding: 10px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .rating-label { color: var(--fg-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
 
   dl { display: grid; grid-template-columns: 90px 1fr; gap: 6px 12px;
     color: var(--fg-dim); margin: 0 0 20px; font-size: 13px; }
@@ -178,14 +284,28 @@
     padding: 8px 14px; border-radius: var(--radius); text-decoration: none; font-size: 13px; }
   .dl:hover { opacity: 0.9; }
 
+  .filmstrip { grid-column: 1 / 4; grid-row: 2;
+    display: flex; gap: 4px; padding: 10px 16px;
+    overflow-x: auto; overflow-y: hidden;
+    background: rgba(0,0,0,0.7); border-top: 1px solid rgba(255,255,255,0.06);
+    scrollbar-width: thin; }
+  .strip-thumb { flex: 0 0 auto; width: 64px; height: 64px;
+    border: 2px solid transparent; border-radius: 3px; overflow: hidden;
+    opacity: 0.55; transition: opacity 0.1s, border-color 0.1s; }
+  .strip-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .strip-thumb:hover { opacity: 0.85; }
+  .strip-thumb.active { opacity: 1; border-color: var(--accent); }
+
   @media (max-width: 900px) {
-    .lightbox { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+    .lightbox { grid-template-columns: 1fr; grid-template-rows: 1fr auto 70px; }
     .close { top: 12px; right: 12px; }
-    .nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 110; }
+    .nav { position: absolute; top: 42%; transform: translateY(-50%); z-index: 110; }
     .nav.left { left: 4px; grid-column: unset; }
     .nav.right { right: 4px; grid-column: unset; }
     .media { grid-column: 1; }
     .info { grid-column: 1; grid-row: 2; padding: 16px 16px 22px;
       border-left: none; border-top: 1px solid var(--border); max-height: 40vh; }
+    .filmstrip { grid-column: 1; grid-row: 3; padding: 6px 10px; }
+    .strip-thumb { width: 56px; height: 56px; }
   }
 </style>

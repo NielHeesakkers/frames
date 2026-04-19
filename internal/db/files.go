@@ -29,6 +29,7 @@ type File struct {
 	ThumbAttempts   int
 	PreviewStatus   string
 	PreviewAttempts int
+	Rating          int
 }
 
 type SortMode int
@@ -37,7 +38,20 @@ const (
 	SortByName SortMode = iota
 	SortByTakenAt
 	SortBySize
+	SortByRating
 )
+
+// SetRating updates the user-editable rating (0..5) for a file.
+func (d *DB) SetRating(fileID int64, rating int) error {
+	if rating < 0 {
+		rating = 0
+	}
+	if rating > 5 {
+		rating = 5
+	}
+	_, err := d.Exec(`UPDATE files SET rating=? WHERE id=?`, rating, fileID)
+	return err
+}
 
 func (d *DB) InsertFile(f File) (int64, error) {
 	res, err := d.Exec(`
@@ -145,6 +159,8 @@ func (d *DB) FilesInFolder(folderID int64, limit, offset int, sort SortMode) ([]
 		order = "COALESCE(taken_at, datetime(mtime, 'unixepoch')) DESC, filename"
 	case SortBySize:
 		order = "size DESC, filename"
+	case SortByRating:
+		order = "rating DESC, COALESCE(taken_at, datetime(mtime, 'unixepoch')) DESC, filename"
 	}
 	q := fileSelect + ` WHERE folder_id=? ORDER BY ` + order + ` LIMIT ? OFFSET ?`
 	rows, err := d.Query(q, folderID, limit, offset)
@@ -227,7 +243,7 @@ func (d *DB) DeleteFilesByFolder(folderID int64, keepFilenames []string) error {
 const fileSelect = `
 SELECT id, folder_id, filename, relative_path, size, mtime, mime_type, kind,
        taken_at, width, height, camera_make, camera_model, orientation, duration_ms,
-       thumb_status, thumb_attempts, preview_status, preview_attempts
+       thumb_status, thumb_attempts, preview_status, preview_attempts, rating
 FROM files`
 
 func scanFile(r rowScanner) (*File, error) {
@@ -238,7 +254,7 @@ func scanFile(r rowScanner) (*File, error) {
 	var dur sql.NullInt64
 	err := r.Scan(&f.ID, &f.FolderID, &f.Filename, &f.RelativePath, &f.Size, &f.Mtime, &f.MimeType, &f.Kind,
 		&takenAt, &w, &h, &make_, &model, &orient, &dur,
-		&f.ThumbStatus, &f.ThumbAttempts, &f.PreviewStatus, &f.PreviewAttempts)
+		&f.ThumbStatus, &f.ThumbAttempts, &f.PreviewStatus, &f.PreviewAttempts, &f.Rating)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}

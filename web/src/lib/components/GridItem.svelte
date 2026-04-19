@@ -35,6 +35,9 @@
     <img src={`/api/thumb/${file.id}`} loading="lazy" alt={file.name} />
   {/if}
   {#if file.kind === 'video'}<span class="badge">▶</span>{/if}
+  {#if (file.rating ?? 0) > 0}
+    <span class="stars">{'★'.repeat(file.rating)}</span>
+  {/if}
 </div>
 
 <style>
@@ -48,4 +51,7 @@
   .badge { position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.6);
     color: #fff; border-radius: 50%; width: 22px; height: 22px; display: grid;
     place-items: center; font-size: 11px; }
+  .stars { position: absolute; bottom: 4px; left: 4px;
+    color: #f5a524; text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    font-size: 11px; letter-spacing: -1px; }
 </style>

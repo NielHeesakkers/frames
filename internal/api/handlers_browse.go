@@ -2,6 +2,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -37,6 +38,7 @@ type fileDTO struct {
 	Height        *int    `json:"height,omitempty"`
 	ThumbStatus   string  `json:"thumb_status"`
 	PreviewStatus string  `json:"preview_status"`
+	Rating        int     `json:"rating"`
 }
 
 func (bd *browseDeps) handleFolder(w http.ResponseWriter, r *http.Request) {
@@ -57,6 +59,8 @@ func (bd *browseDeps) handleFolder(w http.ResponseWriter, r *http.Request) {
 	switch q.Get("sort") {
 	case "name":
 		sort = db.SortByName
+	case "rating":
+		sort = db.SortByRating
 	case "size":
 		sort = db.SortBySize
 	}
@@ -95,6 +99,7 @@ func (bd *browseDeps) handleFolder(w http.ResponseWriter, r *http.Request) {
 			MimeType: fl.MimeType, Mtime: fl.Mtime, TakenAt: takenStr,
 			Width: fl.Width, Height: fl.Height,
 			ThumbStatus: fl.ThumbStatus, PreviewStatus: fl.PreviewStatus,
+			Rating: fl.Rating,
 		})
 	}
 
@@ -149,9 +154,30 @@ func (bd *browseDeps) handleFile(w http.ResponseWriter, r *http.Request) {
 			"camera_make": f.CameraMake, "camera_model": f.CameraModel,
 			"orientation": f.Orientation, "duration_ms": f.DurationMs,
 			"thumb_status": f.ThumbStatus, "preview_status": f.PreviewStatus,
-			"exif": exif,
+			"rating": f.Rating,
+			"exif":   exif,
 		},
 	})
+}
+
+type setRatingReq struct{ Rating int `json:"rating"` }
+
+func (bd *browseDeps) handleSetRating(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "bad id")
+		return
+	}
+	var req setRatingReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if err := bd.DB.SetRating(id, req.Rating); err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (bd *browseDeps) handleTree(w http.ResponseWriter, r *http.Request) {
