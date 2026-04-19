@@ -1,4 +1,4 @@
-<!-- web/src/routes/admin/+page.svelte -->
+<!-- (app)/admin/+page.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
@@ -6,13 +6,12 @@
   import { me, refreshMe } from '$lib/stores';
 
   let users: any[] = [];
-  let status: any = null;
   let newUser = { username: '', password: '', is_admin: false };
   let error = '';
+  let scanMsg = '';
 
   async function load() {
     users = await api.listUsers();
-    status = await api.scanStatus();
   }
   async function add() {
     error = '';
@@ -26,7 +25,11 @@
     if (!confirm('Delete user?')) return;
     await api.deleteUser(id); load();
   }
-  async function scanNow(full: boolean) { await api.scan(full); setTimeout(load, 1000); }
+  async function scanNow(full: boolean) {
+    scanMsg = full ? 'Full scan gestart…' : 'Incremental scan gestart…';
+    await api.scan(full);
+    setTimeout(() => (scanMsg = ''), 4000);
+  }
 
   onMount(async () => {
     let u = $me;
@@ -65,23 +68,36 @@
 
   <section>
     <h3>Scan</h3>
-    <div class="inline">
-      <button on:click={() => scanNow(false)}>Run incremental</button>
-      <button on:click={() => scanNow(true)}>Run full</button>
+    <div class="scan">
+      <div class="scan-item">
+        <p class="explain">Kijkt alleen naar mappen waarvan de <em>modification time</em> veranderd is. Snel, gebruik dit voor een tussentijdse update.</p>
+        <button on:click={() => scanNow(false)}>Run incremental scan</button>
+      </div>
+      <div class="scan-item">
+        <p class="explain">Loopt door de hele library en negeert de mtime-optimalisatie. Trager, maar vangt alles op — inclusief edge cases en correcties na configuratiewijzigingen.</p>
+        <button on:click={() => scanNow(true)}>Run full scan</button>
+      </div>
     </div>
-    {#if status}
-      <pre>{JSON.stringify(status, null, 2)}</pre>
-    {/if}
+    {#if scanMsg}<p class="ok">{scanMsg}</p>{/if}
   </section>
 </div>
 
 <style>
-  .page { padding: 24px; overflow-y: auto; height: 100%; }
+  .page { padding: 24px; overflow-y: auto; height: 100%; max-width: 900px; }
   section { margin-bottom: 28px; }
   table { width: 100%; border-collapse: collapse; margin: 10px 0; }
   th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; }
   .inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  pre { background: var(--bg-2); padding: 12px; border-radius: 6px; overflow-x: auto; }
   .err { color: var(--danger); }
+  .ok { color: #22c55e; margin-top: 8px; }
   button.danger { background: var(--danger); color: white; border-color: var(--danger); }
+  .scan { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .scan-item { background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; display: flex; flex-direction: column;
+    gap: 10px; }
+  .explain { margin: 0; color: var(--fg-dim); font-size: 13px; line-height: 1.5; }
+  .scan-item button { align-self: flex-start; }
+  @media (max-width: 720px) {
+    .scan { grid-template-columns: 1fr; }
+  }
 </style>

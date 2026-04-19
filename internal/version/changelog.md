@@ -2,6 +2,12 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.6.0 — 2026-04-19
+
+- Admin Scan section cleaned up. Two side-by-side cards with a one-line
+  explanation of what each scan does, and a single action button. Raw
+  JSON status dump removed.
+
 ## 0.5.0 — 2026-04-19
 
 - Sidebar folder tree now shows the **total** item count including all
