@@ -1,0 +1,34 @@
+# Binaries
+/frames
+/cmd/frames/frames
+
+# Go build artefacts
+*.test
+*.out
+coverage.*
+
+# SvelteKit build
+/web/.svelte-kit/
+/web/build/
+/web/node_modules/
+/internal/frontend/dist/
+
+# Local data
+/data/
+/cache/
+/photos/
+*.db
+*.db-shm
+*.db-wal
+
+# Secrets — NEVER commit env files with real values
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+
+# Brainstorm artefacts (kept out of main branches)
+/.superpowers/
