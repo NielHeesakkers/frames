@@ -15,7 +15,7 @@
         // Derive the folder path from the file's relative_path to reuse the
         // existing /api/folder/{path} endpoint.
         const relParent = (file.relative_path ?? '').split('/').slice(0, -1).join('/');
-        const folder = await api.folder(relParent, { limit: 1000 });
+        const folder = await api.folder(relParent, { limit: 50000 });
         neighbors = folder.files.map((f: any) => f.id);
       } catch {
         neighbors = [];

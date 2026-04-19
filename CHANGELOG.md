@@ -2,6 +2,18 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.15.0 — 2026-04-19
+
+- Lightbox redesign: close button (✕ top-right, also Esc), ← → actually
+  navigate now (reactive index, 50 k siblings loaded so even large
+  folders work), swipe on touch, position indicator (e.g. "17 of 137").
+- Detailed EXIF panel on the right: camera, lens, focal length,
+  aperture, shutter, ISO, dimensions, size, type, GPS (linked to
+  OpenStreetMap), software, relative path. Read on demand via exiftool
+  in the `/api/file/{id}` response — no DB migration needed.
+- Backend: new `ReadDetailedEXIF` helper and `exif` field on the file
+  DTO.
+
 ## 0.14.0 — 2026-04-19
 
 - Clicking a folder in the sidebar now also expands that folder, so its

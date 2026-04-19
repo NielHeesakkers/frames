@@ -6,16 +6,22 @@
   export let file: any;
   export let neighbors: number[] = [];
 
-  let index = neighbors.indexOf(file.id);
+  // Recompute index reactively so navigation + re-renders stay in sync.
+  $: index = neighbors.indexOf(file.id);
+  $: hasPrev = index > 0;
+  $: hasNext = index >= 0 && index < neighbors.length - 1;
 
-  function close() { history.back(); }
-  function prev() { if (index > 0) goto(`/file/${neighbors[--index]}`); }
-  function next() { if (index >= 0 && index < neighbors.length - 1) goto(`/file/${neighbors[++index]}`); }
+  function close() {
+    if (window.history.length > 1) window.history.back();
+    else goto('/browse');
+  }
+  function prev() { if (hasPrev) goto(`/file/${neighbors[index - 1]}`); }
+  function next() { if (hasNext) goto(`/file/${neighbors[index + 1]}`); }
 
   function onKey(e: KeyboardEvent) {
     if (e.key === 'Escape') close();
-    if (e.key === 'ArrowLeft') prev();
-    if (e.key === 'ArrowRight') next();
+    else if (e.key === 'ArrowLeft') prev();
+    else if (e.key === 'ArrowRight') next();
   }
   onMount(() => window.addEventListener('keydown', onKey));
   onDestroy(() => window.removeEventListener('keydown', onKey));
@@ -26,51 +32,138 @@
     const dx = e.changedTouches[0].clientX - touchStart;
     if (Math.abs(dx) > 60) dx > 0 ? prev() : next();
   }
+
+  function formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+    return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+  }
 </script>
 
-<div class="lightbox" on:click={close}>
-  <button class="nav left" on:click|stopPropagation={prev} disabled={index <= 0}>‹</button>
-  <div class="media" on:click|stopPropagation on:touchstart={onTouchStart} on:touchend={onTouchEnd}>
+<div class="lightbox">
+  <button class="close" on:click={close} title="Sluiten (Esc)">✕</button>
+
+  <button class="nav left" on:click={prev} disabled={!hasPrev} title="Vorige (←)">‹</button>
+
+  <div class="media" on:touchstart={onTouchStart} on:touchend={onTouchEnd}>
     {#if file.kind === 'video'}
       <video src={`/api/original/${file.id}`} controls autoplay></video>
     {:else if file.kind === 'other'}
-      <a href={`/api/original/${file.id}`}>Download {file.name}</a>
+      <a class="download-fallback" href={`/api/original/${file.id}`}>Download {file.name}</a>
     {:else}
       <img src={`/api/preview/${file.id}`} alt={file.name} />
     {/if}
   </div>
-  <button class="nav right" on:click|stopPropagation={next} disabled={index < 0 || index >= neighbors.length - 1}>›</button>
 
-  <aside class="info" on:click|stopPropagation>
-    <h3>{file.name}</h3>
+  <button class="nav right" on:click={next} disabled={!hasNext} title="Volgende (→)">›</button>
+
+  <aside class="info">
+    <h3 title={file.name}>{file.name}</h3>
+    {#if neighbors.length > 0 && index >= 0}
+      <p class="position">{index + 1} van {neighbors.length}</p>
+    {/if}
+
     <dl>
-      <dt>Size</dt><dd>{(file.size / 1024 / 1024).toFixed(2)} MB</dd>
-      {#if file.taken_at}<dt>Taken</dt><dd>{file.taken_at}</dd>{/if}
-      {#if file.camera_model}<dt>Camera</dt><dd>{file.camera_make ?? ''} {file.camera_model}</dd>{/if}
-      {#if file.width}<dt>Dim</dt><dd>{file.width} × {file.height}</dd>{/if}
+      {#if file.exif?.taken_at}
+        <dt>Genomen</dt><dd>{file.exif.taken_at}</dd>
+      {:else if file.taken_at}
+        <dt>Genomen</dt><dd>{file.taken_at.replace('T', ' ')}</dd>
+      {/if}
+
+      {#if file.exif?.camera}
+        <dt>Camera</dt><dd>{file.exif.camera}</dd>
+      {:else if file.camera_model}
+        <dt>Camera</dt><dd>{file.camera_make ?? ''} {file.camera_model}</dd>
+      {/if}
+
+      {#if file.exif?.lens}
+        <dt>Lens</dt><dd>{file.exif.lens}</dd>
+      {/if}
+      {#if file.exif?.focal_length}
+        <dt>Focale</dt><dd>{file.exif.focal_length}</dd>
+      {/if}
+      {#if file.exif?.aperture}
+        <dt>Diafragma</dt><dd>{file.exif.aperture}</dd>
+      {/if}
+      {#if file.exif?.shutter_speed}
+        <dt>Sluiter</dt><dd>{file.exif.shutter_speed}</dd>
+      {/if}
+      {#if file.exif?.iso}
+        <dt>ISO</dt><dd>{file.exif.iso}</dd>
+      {/if}
+
+      {#if file.width}
+        <dt>Afmetingen</dt><dd>{file.width} × {file.height} px</dd>
+      {:else if file.exif?.width}
+        <dt>Afmetingen</dt><dd>{file.exif.width} × {file.exif.height} px</dd>
+      {/if}
+
+      {#if file.size}
+        <dt>Grootte</dt><dd>{formatSize(file.size)}</dd>
+      {/if}
+
+      <dt>Type</dt><dd>{file.mime_type ?? file.kind}</dd>
+
+      {#if file.exif?.gps_lat && file.exif?.gps_lon}
+        <dt>GPS</dt><dd>
+          <a target="_blank" rel="noopener" href={`https://www.openstreetmap.org/?mlat=${encodeURIComponent(file.exif.gps_lat)}&mlon=${encodeURIComponent(file.exif.gps_lon)}#map=16`}>
+            {file.exif.gps_lat}, {file.exif.gps_lon}
+          </a>
+        </dd>
+      {/if}
+      {#if file.exif?.software}
+        <dt>Software</dt><dd>{file.exif.software}</dd>
+      {/if}
+
+      {#if file.relative_path}
+        <dt>Pad</dt><dd class="path" title={file.relative_path}>{file.relative_path}</dd>
+      {/if}
     </dl>
-    <a class="dl" href={`/api/original/${file.id}`} download={file.name}>Download</a>
+
+    <a class="dl" href={`/api/original/${file.id}`} download={file.name}>Download origineel</a>
   </aside>
 </div>
 
 <style>
-  .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.95);
-    display: grid; grid-template-columns: 60px 1fr 300px; z-index: 100; }
+  .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.96);
+    display: grid; grid-template-columns: 60px 1fr 320px; z-index: 100; }
+
+  .close { position: absolute; top: 12px; right: 12px; z-index: 110;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    color: #fff; font-size: 16px; cursor: pointer;
+    display: grid; place-items: center; }
+  .close:hover { background: rgba(255,255,255,0.16); }
+
   .media { display: grid; place-items: center; padding: 20px; grid-column: 2; }
   .media img, .media video { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .download-fallback { color: var(--accent); font-size: 18px; }
+
   .nav { background: transparent; color: #fff; border: none; font-size: 48px;
     cursor: pointer; }
-  .nav:disabled { opacity: 0.3; cursor: default; }
-  .info { background: var(--bg-2); padding: 20px; overflow-y: auto;
+  .nav:disabled { opacity: 0.25; cursor: default; }
+  .nav:not(:disabled):hover { color: var(--accent); }
+
+  .info { background: var(--bg-2); padding: 20px 22px; overflow-y: auto;
     border-left: 1px solid var(--border); }
-  .info dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; color: var(--fg-dim); margin: 10px 0; }
-  dt { text-transform: uppercase; font-size: 11px; }
-  dd { margin: 0; color: var(--fg); }
+  .info h3 { margin: 0 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .position { color: var(--fg-dim); font-size: 12px; margin: 0 0 14px; }
+
+  dl { display: grid; grid-template-columns: 90px 1fr; gap: 6px 12px;
+    color: var(--fg-dim); margin: 0 0 20px; font-size: 13px; }
+  dt { text-transform: uppercase; font-size: 11px; letter-spacing: 0.3px; padding-top: 1px; }
+  dd { margin: 0; color: var(--fg); word-break: break-word; }
+  dd.path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+  dd a { color: var(--accent); }
+
   .dl { display: inline-block; background: var(--accent); color: #fff;
-    padding: 8px 14px; border-radius: var(--radius); text-decoration: none; }
+    padding: 8px 14px; border-radius: var(--radius); text-decoration: none; font-size: 13px; }
+  .dl:hover { opacity: 0.9; }
+
   @media (max-width: 768px) {
     .lightbox { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
     .nav { display: none; }
-    .info { border-left: none; border-top: 1px solid var(--border); }
+    .info { border-left: none; border-top: 1px solid var(--border); max-height: 40vh; }
   }
 </style>

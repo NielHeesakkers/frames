@@ -3,15 +3,18 @@ package api
 
 import (
 	"net/http"
+	"path/filepath"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/NielHeesakkers/frames/internal/db"
+	"github.com/NielHeesakkers/frames/internal/thumbnail"
 )
 
 type browseDeps struct {
-	DB *db.DB
+	DB   *db.DB
+	Root string
 }
 
 type folderDTO struct {
@@ -129,6 +132,15 @@ func (bd *browseDeps) handleFile(w http.ResponseWriter, r *http.Request) {
 		s := f.TakenAt.Format("2006-01-02T15:04:05")
 		taken = &s
 	}
+	// Read a richer EXIF summary on demand. Cheap (single exiftool call) and
+	// avoids bloating the DB schema.
+	var exif *thumbnail.DetailedEXIF
+	if f.Kind == "image" || f.Kind == "raw" {
+		abs := filepath.Join(bd.Root, f.RelativePath)
+		if d, err := thumbnail.ReadDetailedEXIF(r.Context(), abs); err == nil {
+			exif = &d
+		}
+	}
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
 			"id": f.ID, "folder_id": f.FolderID, "name": f.Filename, "relative_path": f.RelativePath,
@@ -137,6 +149,7 @@ func (bd *browseDeps) handleFile(w http.ResponseWriter, r *http.Request) {
 			"camera_make": f.CameraMake, "camera_model": f.CameraModel,
 			"orientation": f.Orientation, "duration_ms": f.DurationMs,
 			"thumb_status": f.ThumbStatus, "preview_status": f.PreviewStatus,
+			"exif": exif,
 		},
 	})
 }
