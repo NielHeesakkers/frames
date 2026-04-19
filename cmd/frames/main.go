@@ -17,6 +17,7 @@ import (
 	"github.com/NielHeesakkers/frames/internal/db"
 	"github.com/NielHeesakkers/frames/internal/logger"
 	"github.com/NielHeesakkers/frames/internal/scanner"
+	"github.com/NielHeesakkers/frames/internal/thumbnail"
 )
 
 func main() {
@@ -65,9 +66,21 @@ func run() error {
 	sched.Start(ctx)
 	defer sched.Stop()
 
+	cache := &thumbnail.Cache{Root: cfg.CacheDir}
+	if err := cache.Ensure(); err != nil {
+		return err
+	}
+	q := thumbnail.NewQueue(4096)
+	pool := &thumbnail.Pool{
+		DB: database, Cache: cache, Queue: q, Log: log,
+		Root: cfg.PhotosRoot, Workers: cfg.Workers,
+	}
+	pool.Start(ctx)
+
 	lim := auth.NewLoginLimiter(5, 15*time.Minute)
 	h := api.NewRouter(api.Deps{
 		Log: log, DB: database, Limiter: lim, Scheduler: sched,
+		Cache: cache, Queue: q, Pool: pool, Root: cfg.PhotosRoot,
 		Secure: strings.HasPrefix(cfg.PublicURL, "https://"),
 	})
 	srv := &http.Server{

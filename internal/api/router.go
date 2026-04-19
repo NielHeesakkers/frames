@@ -11,6 +11,7 @@ import (
 	"github.com/NielHeesakkers/frames/internal/auth"
 	"github.com/NielHeesakkers/frames/internal/db"
 	"github.com/NielHeesakkers/frames/internal/scanner"
+	"github.com/NielHeesakkers/frames/internal/thumbnail"
 )
 
 type Deps struct {
@@ -18,6 +19,10 @@ type Deps struct {
 	DB        *db.DB
 	Limiter   *auth.LoginLimiter
 	Scheduler *scanner.Scheduler
+	Cache     *thumbnail.Cache
+	Queue     *thumbnail.Queue
+	Pool      *thumbnail.Pool
+	Root      string
 	Secure    bool
 }
 
@@ -44,6 +49,11 @@ func NewRouter(d Deps) http.Handler {
 
 			sd := &scanDeps{Scheduler: d.Scheduler}
 			r.Post("/scan", sd.handleTrigger)
+
+			mdx := &mediaDeps{DB: d.DB, Cache: d.Cache, Queue: d.Queue, Pool: d.Pool, Root: d.Root}
+			r.Get("/thumb/{id}", mdx.handleThumb)
+			r.Get("/preview/{id}", mdx.handlePreview)
+			r.Get("/original/{id}", mdx.handleOriginal)
 		})
 	})
 
