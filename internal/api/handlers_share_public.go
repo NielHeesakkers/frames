@@ -348,5 +348,12 @@ func (psh *publicShareDeps) ensureFolder(rel string) error {
 
 func sanitizeName(s string) string {
 	replacer := strings.NewReplacer("/", "_", "\\", "_", "..", "_", "\x00", "_")
-	return replacer.Replace(s)
+	s = replacer.Replace(s)
+	if len(s) > 64 {
+		s = s[:64]
+	}
+	if s == "" || s == "." || s == ".." {
+		s = "anonymous"
+	}
+	return s
 }
