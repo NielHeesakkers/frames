@@ -10,6 +10,7 @@ import (
 
 	"github.com/NielHeesakkers/frames/internal/auth"
 	"github.com/NielHeesakkers/frames/internal/db"
+	"github.com/NielHeesakkers/frames/internal/fsops"
 	"github.com/NielHeesakkers/frames/internal/scanner"
 	"github.com/NielHeesakkers/frames/internal/thumbnail"
 )
@@ -22,6 +23,7 @@ type Deps struct {
 	Cache     *thumbnail.Cache
 	Queue     *thumbnail.Queue
 	Pool      *thumbnail.Pool
+	Ops       *fsops.Ops
 	Root      string
 	Secure    bool
 	PublicURL string
@@ -68,6 +70,14 @@ func NewRouter(d Deps) http.Handler {
 			r.Post("/folder_shares", sh.handleAddFolderShare)
 			r.Delete("/folder_shares", sh.handleRemoveFolderShare)
 			r.Get("/shared_with_me", sh.handleMySharedFolders)
+
+			od := &opsDeps{Ops: d.Ops}
+			r.Post("/ops/mkdir", od.handleMkdir)
+			r.Post("/ops/file/rename", od.handleRenameFile)
+			r.Post("/ops/file/move", od.handleMoveFile)
+			r.Post("/ops/file/delete", od.handleDeleteFile)
+			r.Post("/ops/folder/rename", od.handleRenameFolder)
+			r.Post("/ops/folder/delete", od.handleDeleteFolder)
 		})
 	})
 

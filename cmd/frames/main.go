@@ -15,6 +15,7 @@ import (
 	"github.com/NielHeesakkers/frames/internal/auth"
 	"github.com/NielHeesakkers/frames/internal/config"
 	"github.com/NielHeesakkers/frames/internal/db"
+	"github.com/NielHeesakkers/frames/internal/fsops"
 	"github.com/NielHeesakkers/frames/internal/logger"
 	"github.com/NielHeesakkers/frames/internal/scanner"
 	"github.com/NielHeesakkers/frames/internal/thumbnail"
@@ -77,10 +78,12 @@ func run() error {
 	}
 	pool.Start(ctx)
 
+	ops := &fsops.Ops{DB: database, Root: cfg.PhotosRoot}
+
 	lim := auth.NewLoginLimiter(5, 15*time.Minute)
 	h := api.NewRouter(api.Deps{
 		Log: log, DB: database, Limiter: lim, Scheduler: sched,
-		Cache: cache, Queue: q, Pool: pool, Root: cfg.PhotosRoot,
+		Cache: cache, Queue: q, Pool: pool, Ops: ops, Root: cfg.PhotosRoot,
 		Secure:    strings.HasPrefix(cfg.PublicURL, "https://"),
 		PublicURL: cfg.PublicURL,
 	})
