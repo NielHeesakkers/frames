@@ -2,6 +2,13 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.13.0 — 2026-04-19
+
+- Folder tree now auto-collapses siblings on navigation. Going from
+  `folder01/subfolder` to `folder02` collapses `folder01` and its
+  children; only the ancestor chain of the current path stays open.
+  Manual chevron toggles still work until the next navigation.
+
 ## 0.12.0 — 2026-04-19
 
 - Folder tree remembers which folders you expanded. Expansion state is
