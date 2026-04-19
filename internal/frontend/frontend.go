@@ -5,20 +5,30 @@ import (
 	"embed"
 	"io/fs"
 	"net/http"
+	"os"
 	"strings"
 )
 
 //go:embed all:dist
 var dist embed.FS
 
-// FS returns an http.FileSystem rooted at the embedded dist directory.
-// If no dist exists yet (dev build), returns http.Dir("web/build").
+// FS returns an http.FileSystem for the frontend assets. Precedence:
+//  1. FRAMES_FRONTEND_DIR env var — if set and the directory exists, serve
+//     from disk. This is the hot-reload path for development: just run
+//     `npm run build` (or bind-mount the build dir) and changes show up
+//     on the next request without rebuilding the Go binary.
+//  2. The embedded dist FS (production default).
+//  3. web/build on disk (local dev before first embed).
 func FS() http.FileSystem {
+	if dir := os.Getenv("FRAMES_FRONTEND_DIR"); dir != "" {
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			return http.Dir(dir)
+		}
+	}
 	sub, err := fs.Sub(dist, "dist")
 	if err != nil {
 		return http.Dir("web/build")
 	}
-	// Detect empty FS (scaffold-only).
 	if entries, _ := fs.ReadDir(sub, "."); len(entries) == 0 {
 		return http.Dir("web/build")
 	}
@@ -30,12 +40,10 @@ func Handler() http.Handler {
 	fsys := FS()
 	fileSrv := http.FileServer(fsys)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Don't hijack API paths.
 		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/healthz") {
 			http.NotFound(w, r)
 			return
 		}
-		// Try the file; on 404, serve index.html.
 		if f, err := fsys.Open(r.URL.Path); err == nil {
 			f.Close()
 			fileSrv.ServeHTTP(w, r)

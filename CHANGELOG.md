@@ -2,6 +2,11 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.4.0 — 2026-04-19
+
+- Dev iteration is **~16× faster** for frontend-only changes. New `FRAMES_FRONTEND_DIR` env var: when set, the binary serves the SvelteKit build from that directory instead of the embedded FS, so frontend edits go live after a single `npm run build && rsync` (~3 s total, no Docker rebuild).
+- `scripts/iterate-frontend.sh` and `scripts/iterate-backend.sh` — pick the right speed tier depending on what you changed.
+
 ## 0.3.0 — 2026-04-19
 
 - Recursive folder tree in the sidebar — drill into any depth. Clicking a
