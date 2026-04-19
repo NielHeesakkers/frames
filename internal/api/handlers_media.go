@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -22,6 +24,22 @@ type mediaDeps struct {
 	Queue *thumbnail.Queue
 	Pool  *thumbnail.Pool
 	Root  string
+
+	previewInFlight sync.Map      // key: id (int64), value: struct{}{}
+	previewSem      chan struct{} // buffered cap runtime.NumCPU()
+}
+
+// newMediaDeps constructs a mediaDeps with the preview concurrency semaphore
+// initialized. Use this instead of a bare struct literal.
+func newMediaDeps(d *db.DB, c *thumbnail.Cache, q *thumbnail.Queue, p *thumbnail.Pool, root string) *mediaDeps {
+	return &mediaDeps{
+		DB:         d,
+		Cache:      c,
+		Queue:      q,
+		Pool:       p,
+		Root:       root,
+		previewSem: make(chan struct{}, runtime.NumCPU()),
+	}
 }
 
 func parseID(s string) (int64, error) { return strconv.ParseInt(s, 10, 64) }
@@ -66,7 +84,19 @@ func (md *mediaDeps) handlePreview(w http.ResponseWriter, r *http.Request) {
 	}
 	// Block up to 3s waiting for a render we kick off now. The generation
 	// must outlive this request, so use context.Background() for the goroutine.
-	go func() { _ = md.Pool.GeneratePreview(context.Background(), id) }()
+	// Dedup in-flight requests and bound concurrent preview renders to NumCPU.
+	if _, loaded := md.previewInFlight.LoadOrStore(id, struct{}{}); !loaded {
+		go func() {
+			defer md.previewInFlight.Delete(id)
+			select {
+			case md.previewSem <- struct{}{}:
+				defer func() { <-md.previewSem }()
+				_ = md.Pool.GeneratePreview(context.Background(), id)
+			case <-time.After(30 * time.Second):
+				// Skip if queue is saturated.
+			}
+		}()
+	}
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
 		if fi, err := os.Stat(path); err == nil && fi.Size() > 0 {
