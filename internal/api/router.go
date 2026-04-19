@@ -24,6 +24,7 @@ type Deps struct {
 	Pool      *thumbnail.Pool
 	Root      string
 	Secure    bool
+	PublicURL string
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -62,6 +63,11 @@ func NewRouter(d Deps) http.Handler {
 
 			srd := &searchDeps{DB: d.DB}
 			r.Get("/search", srd.handleSearch)
+
+			sh := &sharesDeps{DB: d.DB, PublicURL: d.PublicURL}
+			r.Post("/folder_shares", sh.handleAddFolderShare)
+			r.Delete("/folder_shares", sh.handleRemoveFolderShare)
+			r.Get("/shared_with_me", sh.handleMySharedFolders)
 		})
 	})
 
