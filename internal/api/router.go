@@ -74,6 +74,12 @@ func NewRouter(d Deps) http.Handler {
 			r.Delete("/folder_shares", sh.handleRemoveFolderShare)
 			r.Get("/shared_with_me", sh.handleMySharedFolders)
 
+			// External share-link CRUD.
+			r.Post("/shares", sh.handleCreateShare)
+			r.Get("/shares", sh.handleListMyShares)
+			r.Delete("/shares/{id}/revoke", sh.handleRevokeShare)
+			r.Delete("/shares/{id}", sh.handleDeleteShare)
+
 			od := &opsDeps{Ops: d.Ops}
 			r.Post("/ops/mkdir", od.handleMkdir)
 			r.Post("/ops/file/rename", od.handleRenameFile)
@@ -84,6 +90,13 @@ func NewRouter(d Deps) http.Handler {
 
 			ud := &uploadDeps{Svc: d.UploadSvc, Queue: d.Queue, MaxBytes: d.MaxUpload}
 			r.Post("/upload", ud.handleUpload)
+		})
+
+		// Admin-only routes (require login + admin).
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireLogin(d.DB), auth.RequireAdmin)
+			sh := &sharesDeps{DB: d.DB, PublicURL: d.PublicURL}
+			r.Get("/admin/shares", sh.handleListAllShares)
 		})
 	})
 
