@@ -2,6 +2,16 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.39.0 — 2026-04-19
+
+- **Orphan-folder GC is now safe against a dropped SMB share.** Two
+  guardrails: (1) the root folder itself must have been visited on this
+  scan — if the mount is broken and the walker sees nothing, we don't
+  delete anything; (2) refuse to delete more than 25 % of folders in a
+  single scan. Either triggers a loud WARN log, no data is touched, and
+  the user can investigate the mount. `Reset library` is still the
+  explicit escape hatch for intentional wipes.
+
 ## 0.38.0 — 2026-04-19
 
 - Video metadata via ffprobe now includes width, height, and rotation.

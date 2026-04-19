@@ -99,7 +99,26 @@ func (s *Scanner) ScanWithProgress(ctx context.Context, full bool, tracker *Prog
 // gcOrphanedFolders removes DB rows for folders not visited on this walk.
 // Cascading FKs handle files + shares within them. Returns the number of
 // files that were deleted via cascade (best-effort).
+//
+// Safeguards against catastrophic data loss when the source mount is
+// unavailable (e.g. SMB share dropped mid-run):
+//   - Root folder MUST have been visited. If it wasn't, the walk didn't
+//     really happen — bail without touching anything.
+//   - Refuse to delete more than 25% of folders in a single scan. A
+//     healthy library never loses that many at once; anything bigger is
+//     almost certainly a broken mount or permission problem.
 func (s *Scanner) gcOrphanedFolders(seen walkSeen, tracker *ProgressTracker) (int64, error) {
+	if !seen[""] {
+		s.Log.Warn("orphan GC skipped: root folder not visited this scan",
+			"seen_count", len(seen))
+		return 0, nil
+	}
+
+	var totalDB int64
+	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM folders`).Scan(&totalDB); err != nil {
+		return 0, err
+	}
+
 	rows, err := s.DB.Query(`SELECT id, path FROM folders`)
 	if err != nil {
 		return 0, err
@@ -121,9 +140,20 @@ func (s *Scanner) gcOrphanedFolders(seen walkSeen, tracker *ProgressTracker) (in
 	}
 	rows.Close()
 
+	// Guardrail: never delete more than 25% of folders in a single scan.
+	// Catches the scenario where /photos is mounted but unreadable, empty,
+	// or briefly unavailable. The user can still use "Reset library" if
+	// they really do want to wipe everything.
+	if totalDB > 4 && int64(len(toDelete))*4 > totalDB {
+		s.Log.Warn("orphan GC refusing to run — would delete too many folders",
+			"would_delete", len(toDelete), "total_db", totalDB,
+			"seen_on_disk", len(seen),
+			"hint", "the /photos mount is probably broken; check it before re-running")
+		return 0, nil
+	}
+
 	var removed int64
 	for _, o := range toDelete {
-		// Count files first so we can report what the cascade wipes out.
 		var n int64
 		_ = s.DB.QueryRow(`SELECT COUNT(*) FROM files WHERE folder_id=?`, o.id).Scan(&n)
 		if _, err := s.DB.Exec(`DELETE FROM folders WHERE id=?`, o.id); err == nil {
