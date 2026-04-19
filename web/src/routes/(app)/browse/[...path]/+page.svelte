@@ -1,9 +1,7 @@
-<!-- web/src/routes/browse/[...path]/+page.svelte -->
+<!-- (app)/browse/[...path]/+page.svelte — render same component as root /browse.
+     The inner component derives the folder path from $page.params itself. -->
 <script lang="ts">
-  import { page } from '$app/stores';
-  import { currentFolderPath } from '$lib/stores';
   import BrowseRoot from '../+page.svelte';
-  $: currentFolderPath.set(decodeURIComponent($page.params.path ?? ''));
 </script>
 
 <BrowseRoot />

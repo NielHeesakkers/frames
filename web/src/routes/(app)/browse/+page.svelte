@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import { api } from '$lib/api';
   import { currentFolderPath, sortMode, density, selection } from '$lib/stores';
   import Grid from '$lib/components/Grid.svelte';
@@ -68,7 +68,12 @@
     loading = false;
   }
 
-  onMount(() => { currentFolderPath.set(''); });
+  // Drive the current folder path from the URL so a page reload keeps you in
+  // the same folder instead of bouncing back to root.
+  $: {
+    const p = ($page.params as any)?.path;
+    currentFolderPath.set(p ? decodeURIComponent(p) : '');
+  }
   $: $currentFolderPath, load();
 
   function onContext(e: CustomEvent<{ file: any; x: number; y: number }>) { menu = e.detail; }

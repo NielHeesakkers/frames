@@ -2,6 +2,12 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.8.0 — 2026-04-19
+
+- Browse view now drives the current folder from the URL, so a page reload
+  (F5 / Cmd-R) keeps you in the same folder instead of bouncing back to
+  root. Fixes the onMount that always reset to `''`.
+
 ## 0.7.0 — 2026-04-19
 
 - Home view cleaned up: "Laatste toegevoegde mappen" and "Alle mappen"
