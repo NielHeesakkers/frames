@@ -2,6 +2,18 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.38.0 — 2026-04-19
+
+- Video metadata via ffprobe now includes width, height, and rotation.
+  Rotated videos (iPhone portrait recordings with a 90°/270° rotate tag)
+  have their dimensions swapped so the grid lays them out with the
+  correct aspect ratio.
+- Scanner GCs orphan folders. If a top-level directory vanished from
+  disk (e.g. you changed the `/photos` mount), the next scan now deletes
+  the DB folder + cascades its files instead of leaving zombies that
+  retry thumbnailing forever. Runs only after a successful walk so a
+  transient mount hiccup can't wipe data.
+
 ## 0.37.0 — 2026-04-19
 
 - **Group-by filter** in the toolbar with options "Niet groeperen",

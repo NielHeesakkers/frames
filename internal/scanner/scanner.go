@@ -37,6 +37,10 @@ func (s *Scanner) Scan(ctx context.Context, full bool) (Stats, error) {
 	return s.ScanWithProgress(ctx, full, nil)
 }
 
+// seen is populated during the walk so we can garbage-collect DB folders
+// that disappeared from disk (e.g. after the /photos mount changed).
+type walkSeen map[string]bool
+
 // ScanWithProgress is like Scan but reports live counters into `tracker` as
 // the walk proceeds. Pass nil to disable progress tracking.
 func (s *Scanner) ScanWithProgress(ctx context.Context, full bool, tracker *ProgressTracker) (Stats, error) {
@@ -63,12 +67,25 @@ func (s *Scanner) ScanWithProgress(ctx context.Context, full bool, tracker *Prog
 	}
 
 	var stats Stats
+	seen := walkSeen{}
 	err = WalkDirs(ctx, s.Root, func(dir dirEntry, files []fileEntry) error {
 		if tracker != nil {
 			tracker.Folders.Add(1)
 		}
+		seen[dir.RelPath] = true
 		return s.handleDir(dir, files, full, &stats, tracker)
 	})
+
+	// Garbage-collect folders that were in the DB but no longer on disk.
+	// Only do this on a successful walk so partial failures don't wipe data.
+	if err == nil {
+		if gcRemoved, gerr := s.gcOrphanedFolders(seen, tracker); gerr == nil {
+			stats.Removed += gcRemoved
+		} else {
+			s.Log.Warn("orphan-folder GC failed", "err", gerr)
+		}
+	}
+
 	emsg := ""
 	if err != nil {
 		emsg = err.Error()
@@ -77,6 +94,47 @@ func (s *Scanner) ScanWithProgress(ctx context.Context, full bool, tracker *Prog
 		s.Log.Warn("failed to finish scan job", "err", fErr)
 	}
 	return stats, err
+}
+
+// gcOrphanedFolders removes DB rows for folders not visited on this walk.
+// Cascading FKs handle files + shares within them. Returns the number of
+// files that were deleted via cascade (best-effort).
+func (s *Scanner) gcOrphanedFolders(seen walkSeen, tracker *ProgressTracker) (int64, error) {
+	rows, err := s.DB.Query(`SELECT id, path FROM folders`)
+	if err != nil {
+		return 0, err
+	}
+	type orph struct {
+		id   int64
+		path string
+	}
+	var toDelete []orph
+	for rows.Next() {
+		var id int64
+		var path string
+		if err := rows.Scan(&id, &path); err != nil {
+			continue
+		}
+		if !seen[path] {
+			toDelete = append(toDelete, orph{id, path})
+		}
+	}
+	rows.Close()
+
+	var removed int64
+	for _, o := range toDelete {
+		// Count files first so we can report what the cascade wipes out.
+		var n int64
+		_ = s.DB.QueryRow(`SELECT COUNT(*) FROM files WHERE folder_id=?`, o.id).Scan(&n)
+		if _, err := s.DB.Exec(`DELETE FROM folders WHERE id=?`, o.id); err == nil {
+			removed += n
+			if tracker != nil && n > 0 {
+				tracker.Removed.Add(n)
+			}
+			s.Log.Info("removed orphan folder", "path", o.path, "files", n)
+		}
+	}
+	return removed, nil
 }
 
 func (s *Scanner) handleDir(dir dirEntry, files []fileEntry, full bool, stats *Stats, tracker *ProgressTracker) error {

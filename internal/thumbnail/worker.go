@@ -111,14 +111,27 @@ func (p *Pool) processOne(ctx context.Context, id int64) error {
 	dst := p.Cache.ThumbPath(id)
 
 	// Read metadata (best effort).
-	if up, mErr := ReadMetadata(ctx, src); mErr == nil {
-		_ = p.DB.UpdateFileMetadata(id, up)
-		// For videos, add duration.
-		if f.Kind == "video" {
-			if dur, derr := ProbeVideoDurationMs(ctx, src); derr == nil {
-				up2 := db.MetadataUpdate{DurationMs: &dur}
-				_ = p.DB.UpdateFileMetadata(id, up2)
+	if f.Kind == "video" {
+		// ffprobe-driven metadata: width/height/rotation/duration.
+		if info, derr := ProbeVideoInfo(ctx, src); derr == nil {
+			w, h := info.Width, info.Height
+			if info.Rotation == 90 || info.Rotation == 270 {
+				w, h = h, w
 			}
+			up := db.MetadataUpdate{
+				DurationMs: &info.DurationMs,
+			}
+			if w > 0 {
+				up.Width = &w
+			}
+			if h > 0 {
+				up.Height = &h
+			}
+			_ = p.DB.UpdateFileMetadata(id, up)
+		}
+	} else {
+		if up, mErr := ReadMetadata(ctx, src); mErr == nil {
+			_ = p.DB.UpdateFileMetadata(id, up)
 		}
 	}
 
