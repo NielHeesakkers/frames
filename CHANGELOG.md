@@ -2,6 +2,14 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.5.0 — 2026-04-19
+
+- Sidebar folder tree now shows the **total** item count including all
+  descendants, not just direct files. A container folder like `2018 Berlin`
+  that holds only subfolders (`JPG`, `RAW`) previously read `0`; it now
+  shows the sum across the subtree. Single recursive CTE per expansion —
+  still fast.
+
 ## 0.4.0 — 2026-04-19
 
 - Dev iteration is **~16× faster** for frontend-only changes. New `FRAMES_FRONTEND_DIR` env var: when set, the binary serves the SvelteKit build from that directory instead of the embedded FS, so frontend edits go live after a single `npm run build && rsync` (~3 s total, no Docker rebuild).

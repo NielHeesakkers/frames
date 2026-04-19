@@ -159,12 +159,44 @@ func (bd *browseDeps) handleTree(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	// One recursive CTE returns (ancestor_id, total_items) for every child of the parent.
+	// ancestor_id is the direct child of parentID; descendant_id enumerates its entire
+	// subtree (inclusive). We then join files by folder_id = descendant_id and count.
+	totals := make(map[int64]int64, len(kids))
+	hasSub := make(map[int64]bool, len(kids))
+	rows, err := bd.DB.Query(`
+		WITH RECURSIVE subtree(ancestor_id, descendant_id) AS (
+			SELECT id, id FROM folders WHERE parent_id = ?
+			UNION ALL
+			SELECT s.ancestor_id, f.id FROM folders f JOIN subtree s ON f.parent_id = s.descendant_id
+		)
+		SELECT s.ancestor_id, COUNT(files.id) AS total, MAX(s.descendant_id != s.ancestor_id) AS has_sub
+		FROM subtree s
+		LEFT JOIN files ON files.folder_id = s.descendant_id
+		GROUP BY s.ancestor_id
+	`, parentID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var id, count int64
+			var hs int
+			if err := rows.Scan(&id, &count, &hs); err == nil {
+				totals[id] = count
+				hasSub[id] = hs == 1
+			}
+		}
+	}
+
 	out := make([]treeNodeDTO, 0, len(kids))
 	for _, c := range kids {
-		sub, _ := bd.DB.ChildFolders(c.ID)
+		t, ok := totals[c.ID]
+		if !ok {
+			t = c.ItemCount
+		}
 		out = append(out, treeNodeDTO{
 			ID: c.ID, Path: c.Path, Name: c.Name,
-			HasChild: len(sub) > 0, Items: c.ItemCount,
+			HasChild: hasSub[c.ID], Items: t,
 		})
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"data": out})
