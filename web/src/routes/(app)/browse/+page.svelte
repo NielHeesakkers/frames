@@ -37,7 +37,9 @@
   async function load() {
     loading = true;
     const sort = $sortMode === 'takenAt' ? 'taken' : $sortMode;
-    const r = await api.folder($currentFolderPath, { sort, limit: 500 });
+    // Leaf folders can contain thousands of photos; ask for everything and
+    // let the backend cap at its safety limit.
+    const r = await api.folder($currentFolderPath, { sort, limit: 50000 });
     folder = r.folder;
     folders = r.folders;
     files = r.files;
@@ -164,8 +166,7 @@
           <h3>Submappen</h3>
           <div class="folder-cards">
             {#each folders as sub}
-              <a class="fcard" href={`/browse/${sub.path.split('/').map(encodeURIComponent).join('/')}`}
-                 on:click|preventDefault={() => currentFolderPath.set(sub.path)}>
+              <a class="fcard" href={`/browse/${sub.path.split('/').map(encodeURIComponent).join('/')}`}>
                 <div class="ico">📁</div>
                 <div class="name">{sub.name}</div>
                 <div class="cnt">{sub.items} items</div>

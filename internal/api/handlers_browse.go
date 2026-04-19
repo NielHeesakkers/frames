@@ -41,8 +41,13 @@ func (bd *browseDeps) handleFolder(w http.ResponseWriter, r *http.Request) {
 	pathParam := chi.URLParam(r, "*")
 	q := r.URL.Query()
 	limit, _ := strconv.Atoi(q.Get("limit"))
-	if limit <= 0 || limit > 1000 {
+	if limit <= 0 {
 		limit = 200
+	}
+	// Safety cap: even if a client asks for more, stop here. 50k covers
+	// essentially any realistic single folder; for bigger folders, paginate.
+	if limit > 50000 {
+		limit = 50000
 	}
 	offset, _ := strconv.Atoi(q.Get("offset"))
 	sort := db.SortByTakenAt

@@ -2,6 +2,19 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.9.0 — 2026-04-19
+
+- **Folder navigation now changes the URL** — clicking a subfolder card
+  was using `preventDefault` and only updating the local store, so the
+  URL never followed. Refresh would therefore take you back to whatever
+  the URL still pointed at (often root's first folder). Fixed — subfolder
+  cards and breadcrumb links now navigate the URL normally; the path is
+  derived from `$page.params.path`.
+- **Folder listings show everything** — backend limit cap raised from
+  1,000 to 50,000 per folder, and the frontend requests 50k. Leaf folders
+  with thousands of photos render in full. For the rare folder beyond
+  50k, pagination is still needed (not in v0.9).
+
 ## 0.8.0 — 2026-04-19
 
 - Browse view now drives the current folder from the URL, so a page reload
