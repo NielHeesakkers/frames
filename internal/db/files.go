@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -219,3 +220,61 @@ func scanFile(r rowScanner) (*File, error) {
 }
 
 func scanFileRows(r *sql.Rows) (*File, error) { return scanFile(r) }
+
+type SearchQuery struct {
+	Query    string
+	DateFrom *time.Time
+	DateTo   *time.Time
+	Camera   string
+	Kind     string // image | raw | video | other | ""
+	Limit    int
+	Offset   int
+}
+
+func (d *DB) SearchFiles(q SearchQuery) ([]File, error) {
+	var args []any
+	where := []string{"1=1"}
+	if q.Query != "" {
+		where = append(where, "(filename LIKE ? OR relative_path LIKE ?)")
+		p := "%" + q.Query + "%"
+		args = append(args, p, p)
+	}
+	if q.DateFrom != nil {
+		where = append(where, "(taken_at >= ? OR (taken_at IS NULL AND datetime(mtime,'unixepoch') >= ?))")
+		args = append(args, q.DateFrom, q.DateFrom)
+	}
+	if q.DateTo != nil {
+		where = append(where, "(taken_at <= ? OR (taken_at IS NULL AND datetime(mtime,'unixepoch') <= ?))")
+		args = append(args, q.DateTo, q.DateTo)
+	}
+	if q.Camera != "" {
+		where = append(where, "(camera_make LIKE ? OR camera_model LIKE ?)")
+		p := "%" + q.Camera + "%"
+		args = append(args, p, p)
+	}
+	if q.Kind != "" {
+		where = append(where, "kind = ?")
+		args = append(args, q.Kind)
+	}
+	if q.Limit <= 0 || q.Limit > 1000 {
+		q.Limit = 200
+	}
+	args = append(args, q.Limit, q.Offset)
+
+	query := fileSelect + " WHERE " + strings.Join(where, " AND ") +
+		" ORDER BY COALESCE(taken_at, datetime(mtime,'unixepoch')) DESC LIMIT ? OFFSET ?"
+	rows, err := d.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []File
+	for rows.Next() {
+		f, err := scanFileRows(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *f)
+	}
+	return out, rows.Err()
+}
