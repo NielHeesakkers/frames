@@ -5,6 +5,7 @@
   import { refreshMe, me, logout } from '$lib/stores';
   import FolderTree from '$lib/components/FolderTree.svelte';
   import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+  import SearchBox from '$lib/components/SearchBox.svelte';
 
   onMount(async () => {
     const u = await refreshMe();
@@ -28,6 +29,7 @@
     <main>
       <header>
         <Breadcrumb />
+        <SearchBox />
       </header>
       <div class="main-inner">
         <slot />
