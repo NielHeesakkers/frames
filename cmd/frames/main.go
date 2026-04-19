@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/NielHeesakkers/frames/internal/api"
+	"github.com/NielHeesakkers/frames/internal/auth"
 	"github.com/NielHeesakkers/frames/internal/config"
 	"github.com/NielHeesakkers/frames/internal/db"
 	"github.com/NielHeesakkers/frames/internal/logger"
@@ -43,7 +45,11 @@ func run() error {
 		return err
 	}
 
-	h := api.NewRouter(api.Deps{Log: log})
+	lim := auth.NewLoginLimiter(5, 15*time.Minute)
+	h := api.NewRouter(api.Deps{
+		Log: log, DB: database, Limiter: lim,
+		Secure: strings.HasPrefix(cfg.PublicURL, "https://"),
+	})
 	srv := &http.Server{
 		Addr:              cfg.Bind,
 		Handler:           h,

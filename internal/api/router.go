@@ -1,3 +1,4 @@
+// internal/api/router.go
 package api
 
 import (
@@ -6,18 +7,40 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/NielHeesakkers/frames/internal/auth"
+	"github.com/NielHeesakkers/frames/internal/db"
 )
 
 type Deps struct {
-	Log *slog.Logger
+	Log     *slog.Logger
+	DB      *db.DB
+	Limiter *auth.LoginLimiter
+	Secure  bool
 }
 
 func NewRouter(d Deps) http.Handler {
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID)
-	r.Use(middleware.Recoverer)
+	r.Use(middleware.RequestID, middleware.Recoverer)
+
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
+
+	ad := &AuthDeps{DB: d.DB, Limiter: d.Limiter, Secure: d.Secure}
+
+	// CSRF applies to all /api routes. Login itself is unsafe but is only reachable
+	// after a GET seeded the cookie; the frontend fetches /api/me (GET) first.
+	r.Route("/api", func(r chi.Router) {
+		r.Use(auth.CSRF)
+		r.Post("/login", ad.handleLogin)
+		r.Post("/logout", ad.handleLogout)
+
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireLogin(d.DB))
+			r.Get("/me", handleMe)
+		})
+	})
+
 	return r
 }
