@@ -3,6 +3,7 @@ package api
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -32,6 +33,7 @@ type publicShareDeps struct {
 	Upload   *upload.Service
 	Queue    *thumbnail.Queue
 	MaxBytes int64
+	Log      *slog.Logger
 }
 
 // thumbnailCache is a minimal interface matching *thumbnail.Cache.
@@ -240,8 +242,7 @@ func (psh *publicShareDeps) handleZip(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`.zip"`)
 	if err := share.StreamFolderZip(w, psh.DB, psh.Root, folder.Path); err != nil {
-		// Can't change status at this point; just log.
-		_ = err
+		psh.Log.Warn("zip stream error", "token", chi.URLParam(r, "token"), "err", err)
 	}
 }
 

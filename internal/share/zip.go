@@ -49,16 +49,17 @@ func StreamFolderZip(w io.Writer, d *db.DB, root, rootPath string) error {
 func addFile(zw *zip.Writer, abs, entryName string) error {
 	fh, err := os.Open(abs)
 	if err != nil {
-		return err
+		// File vanished between scan and zip; skip rather than abort archive.
+		return nil
 	}
 	defer fh.Close()
 	fi, err := fh.Stat()
 	if err != nil {
-		return err
+		return nil
 	}
 	hdr, err := zip.FileInfoHeader(fi)
 	if err != nil {
-		return err
+		return nil
 	}
 	hdr.Name = entryName
 	hdr.Method = zip.Deflate
