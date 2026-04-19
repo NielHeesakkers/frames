@@ -19,7 +19,7 @@ COPY . .
 # Copy built frontend into embed path.
 RUN rm -rf internal/frontend/dist && mkdir -p internal/frontend/dist
 COPY --from=web /web/build internal/frontend/dist
-RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o /out/frames ./cmd/frames
+RUN CGO_ENABLED=1 go build -tags="sqlite_fts5" -ldflags="-s -w" -o /out/frames ./cmd/frames
 
 # ---------- Stage 3: runtime ----------
 FROM alpine:3.20

@@ -2,6 +2,14 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.24.0 — 2026-04-19
+
+- Hover on a grid thumbnail shows an overlay with filename, resolution,
+  and file size along the top (existing hover rating stays at the bottom).
+- Build now tags `sqlite_fts5` so the FTS5 virtual table added in 0.23
+  actually loads at runtime (mattn/go-sqlite3 gates FTS5 behind a build
+  tag). Dockerfile + Makefile updated.
+
 ## 0.23.0 — 2026-04-19
 
 - **Thumbnail shape toggle** in the toolbar: "Squares" (uniform crop,

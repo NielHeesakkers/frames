@@ -5,7 +5,7 @@ changelog:
 	cp CHANGELOG.md internal/version/changelog.md
 
 build: changelog
-	go build -o frames ./cmd/frames
+	go build -tags="sqlite_fts5" -o frames ./cmd/frames
 
 test:
 	go test ./... -count=1

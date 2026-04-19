@@ -47,6 +47,13 @@
     }
   }
 
+  function formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+  }
+
   // Aspect-ratio mode: width is computed from the file's natural dims and the
   // fixed row height `size`. Falls back to square when dims are unknown.
   $: aspect = file.width && file.height ? file.width / file.height : 1;
@@ -79,6 +86,16 @@
 
   {#if file.kind === 'video'}<span class="badge">▶</span>{/if}
 
+  {#if hovering}
+    <div class="meta">
+      <div class="name" title={file.name}>{file.name}</div>
+      <div class="row">
+        {#if file.width && file.height}<span>{file.width}×{file.height}</span>{/if}
+        {#if file.size}<span>{formatSize(file.size)}</span>{/if}
+      </div>
+    </div>
+  {/if}
+
   <div class="rating-overlay" class:show={hovering || (file.rating ?? 0) > 0}>
     <StarRating value={file.rating ?? 0} onChange={onRatingChange} size={Math.max(14, Math.round(size / 11))} />
   </div>
@@ -98,9 +115,17 @@
     color: #fff; border-radius: 50%; width: 22px; height: 22px; display: grid;
     place-items: center; font-size: 11px; }
 
+  .meta { position: absolute; left: 0; right: 0; top: 0;
+    padding: 8px 10px 12px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0));
+    color: #fff; font-size: 11px; pointer-events: none; }
+  .meta .name { font-weight: 500; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; margin-bottom: 2px; }
+  .meta .row { display: flex; gap: 8px; color: rgba(255,255,255,0.8); font-size: 10px; }
+
   .rating-overlay { position: absolute; left: 0; right: 0; bottom: 0;
-    padding: 6px 6px 4px;
-    background: linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0));
+    padding: 14px 6px 4px;
+    background: linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0));
     display: flex; justify-content: flex-start;
     opacity: 0; transition: opacity 0.1s;
     pointer-events: none; }
