@@ -2,6 +2,16 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.10.0 — 2026-04-19
+
+- **Refresh at a nested folder URL now actually loads that folder.** The
+  previous version imported the root `/browse` component into the
+  `[...path]` route and read `$page.params` inside — which silently did
+  not populate on reload. Extracted the view into
+  `$lib/components/BrowseView.svelte` with an explicit `path` prop, so
+  both `/browse` and `/browse/[...path]` pages pass the path in directly
+  and the component can't drift from the URL.
+
 ## 0.9.0 — 2026-04-19
 
 - **Folder navigation now changes the URL** — clicking a subfolder card
