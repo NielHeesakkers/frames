@@ -51,6 +51,7 @@ export const api = {
   tree: (parent?: string) =>
     req<Array<{ id: number; path: string; name: string; has_child: boolean; items: number }>>(
       'GET', `/api/tree${parent ? `?parent=${encodeURIComponent(parent)}` : ''}`),
+  file: (id: number) => req<any>('GET', `/api/file/${id}`),
   search: (q: Record<string, string>) =>
     req<{ files: any[]; has_more: boolean }>('GET', '/api/search?' + new URLSearchParams(q)),
 

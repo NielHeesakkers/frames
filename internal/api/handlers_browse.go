@@ -108,6 +108,34 @@ type treeNodeDTO struct {
 	Items    int64  `json:"items"`
 }
 
+func (bd *browseDeps) handleFile(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "bad id")
+		return
+	}
+	f, err := bd.DB.FileByID(id)
+	if err != nil {
+		WriteError(w, http.StatusNotFound, "not found")
+		return
+	}
+	var taken *string
+	if f.TakenAt != nil {
+		s := f.TakenAt.Format("2006-01-02T15:04:05")
+		taken = &s
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"id": f.ID, "folder_id": f.FolderID, "name": f.Filename, "relative_path": f.RelativePath,
+			"size": f.Size, "mtime": f.Mtime, "kind": f.Kind, "mime_type": f.MimeType,
+			"taken_at": taken, "width": f.Width, "height": f.Height,
+			"camera_make": f.CameraMake, "camera_model": f.CameraModel,
+			"orientation": f.Orientation, "duration_ms": f.DurationMs,
+			"thumb_status": f.ThumbStatus, "preview_status": f.PreviewStatus,
+		},
+	})
+}
+
 func (bd *browseDeps) handleTree(w http.ResponseWriter, r *http.Request) {
 	parentPath := r.URL.Query().Get("parent")
 	var parentID int64
