@@ -2,6 +2,13 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.11.0 — 2026-04-19
+
+- Folder tree in the sidebar auto-expands to the current path on page
+  load. If the URL is `/browse/2018 Berlin/JPG`, the tree shows
+  `2018 Berlin` expanded with `JPG` highlighted — no more losing your
+  position in the tree after a refresh.
+
 ## 0.10.0 — 2026-04-19
 
 - **Refresh at a nested folder URL now actually loads that folder.** The
