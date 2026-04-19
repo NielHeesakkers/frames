@@ -7,6 +7,7 @@
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import UploadDialog from '$lib/components/UploadDialog.svelte';
   import MovePicker from '$lib/components/MovePicker.svelte';
+  import ShareDialog from '$lib/components/ShareDialog.svelte';
 
   let folder: any = null;
   let folders: any[] = [];
@@ -20,6 +21,7 @@
   let uploading = false;
   let newFolderName = '';
   let showNewFolder = false;
+  let sharing: any = null;
 
   async function load() {
     loading = true;
@@ -54,6 +56,7 @@
       { label: 'Download', onSelect: () => location.assign(`/api/original/${f.id}`) },
       { label: 'Rename…', onSelect: () => { const n = prompt('New name', f.name); if (n && n !== f.name) doRename(f, n); } },
       { label: 'Move…', onSelect: () => (moving = f) },
+      { label: 'Share folder containing…', onSelect: () => (sharing = { id: folder.id, path: folder.path }) },
       { label: 'Delete', danger: true, onSelect: () => (confirmDelete = f) }
     ];
   }
@@ -70,6 +73,7 @@
   </select>
   <div class="spacer" />
   <button on:click={() => (showNewFolder = true)}>New folder</button>
+  <button on:click={() => (sharing = { id: folder.id, path: folder.path })}>Share</button>
   <button class="primary" on:click={() => (uploading = true)}>+ Upload</button>
 </div>
 
@@ -129,6 +133,10 @@
   >
     <input slot="body" bind:value={newFolderName} placeholder="Folder name" />
   </ConfirmDialog>
+{/if}
+
+{#if sharing}
+  <ShareDialog folderId={sharing.id} folderPath={sharing.path} onClose={() => (sharing = null)} />
 {/if}
 
 <style>
