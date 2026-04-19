@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/NielHeesakkers/frames/internal/auth"
@@ -12,9 +13,10 @@ import (
 )
 
 type AuthDeps struct {
-	DB      *db.DB
-	Limiter *auth.LoginLimiter
-	Secure  bool // set Secure cookies in prod
+	DB         *db.DB
+	Limiter    *auth.LoginLimiter
+	Secure     bool // set Secure cookies in prod
+	TrustProxy bool // honour X-Forwarded-For for client IP
 }
 
 type loginReq struct {
@@ -23,7 +25,7 @@ type loginReq struct {
 }
 
 func (ad *AuthDeps) handleLogin(w http.ResponseWriter, r *http.Request) {
-	ip := clientIP(r)
+	ip := clientIP(r, ad.TrustProxy)
 	if !ad.Limiter.Allow(ip) {
 		WriteError(w, http.StatusTooManyRequests, "too many attempts, try later")
 		return
@@ -81,15 +83,19 @@ func handleMe(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func clientIP(r *http.Request) string {
-	// Prefer X-Forwarded-For first entry when behind trusted proxy; fallback to remote addr.
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		for i := 0; i < len(xff); i++ {
-			if xff[i] == ',' {
-				return xff[:i]
+func clientIP(r *http.Request, trustProxy bool) string {
+	// Only honour X-Forwarded-For when the operator has explicitly opted in via
+	// FRAMES_TRUST_PROXY. Otherwise direct clients could spoof this header to
+	// evade per-IP rate limits.
+	if trustProxy {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			for i := 0; i < len(xff); i++ {
+				if xff[i] == ',' {
+					return strings.TrimSpace(xff[:i])
+				}
 			}
+			return strings.TrimSpace(xff)
 		}
-		return xff
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

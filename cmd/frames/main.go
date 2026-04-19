@@ -105,6 +105,7 @@ func run() error {
 		MaxUpload:      cfg.MaxUploadSize,
 		ShareUploadMax: cfg.ShareUploadMax,
 		Secure:         strings.HasPrefix(cfg.PublicURL, "https://"),
+		TrustProxy:     cfg.TrustProxy,
 		PublicURL:      cfg.PublicURL,
 	})
 	srv := &http.Server{

@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -23,6 +24,7 @@ type Config struct {
 	ShareUploadMax int64
 	AdminUsername  string
 	AdminPassword  string
+	TrustProxy     bool
 }
 
 func Load() (*Config, error) {
@@ -57,6 +59,8 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("FRAMES_SHARE_UPLOAD_MAX: %w", err)
 	}
+
+	cfg.TrustProxy = parseBool(os.Getenv("FRAMES_TRUST_PROXY"))
 
 	if cfg.SessionSecret == "" {
 		return nil, errors.New("FRAMES_SESSION_SECRET is required")
@@ -106,4 +110,12 @@ func parseSize(s string) (int64, error) {
 
 func hasSuffix(s, suf string) bool {
 	return len(s) >= len(suf) && s[len(s)-len(suf):] == suf
+}
+
+func parseBool(s string) bool {
+	switch strings.ToLower(s) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }

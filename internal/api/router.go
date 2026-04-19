@@ -34,6 +34,7 @@ type Deps struct {
 	ShareUploadMax int64
 	Root           string
 	Secure         bool
+	TrustProxy     bool
 	PublicURL      string
 }
 
@@ -45,7 +46,7 @@ func NewRouter(d Deps) http.Handler {
 		WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	ad := &AuthDeps{DB: d.DB, Limiter: d.Limiter, Secure: d.Secure}
+	ad := &AuthDeps{DB: d.DB, Limiter: d.Limiter, Secure: d.Secure, TrustProxy: d.TrustProxy}
 
 	// CSRF applies to all /api routes. Login itself is unsafe but is only reachable
 	// after a GET seeded the cookie; the frontend fetches /api/me (GET) first.
