@@ -17,12 +17,12 @@ type uploadDeps struct {
 }
 
 func (ud *uploadDeps) handleUpload(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, ud.MaxBytes)
 	if err := r.ParseMultipartForm(64 << 20); err != nil { // 64 MiB in-memory; rest to disk
 		WriteError(w, http.StatusBadRequest, "invalid multipart")
 		return
 	}
 	folderPath := r.FormValue("path") // target folder relative path, "" = root
-	r.Body = http.MaxBytesReader(w, r.Body, ud.MaxBytes)
 
 	files := r.MultipartForm.File["files"]
 	if len(files) == 0 {
