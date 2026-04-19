@@ -46,14 +46,14 @@
   }
 
   // Build the set of paths that should be expanded given the current URL path.
-  // = every ancestor of `currentPath` (NOT the leaf itself — expanding the
-  // leaf just loads its children which we don't need until the user opens it).
+  // Includes every ancestor AND the target folder itself — so clicking a
+  // folder in the sidebar also reveals its subfolders.
   function ancestorsOf(currentPath: string): Set<string> {
     const s = new Set<string>();
     if (!currentPath) return s;
     const parts = currentPath.split('/');
     let accum = '';
-    for (let i = 0; i < parts.length - 1; i++) {
+    for (let i = 0; i < parts.length; i++) {
       accum = accum ? `${accum}/${parts[i]}` : parts[i];
       s.add(accum);
     }

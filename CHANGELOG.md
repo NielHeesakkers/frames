@@ -2,6 +2,11 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.14.0 — 2026-04-19
+
+- Clicking a folder in the sidebar now also expands that folder, so its
+  subfolders become visible without a separate chevron click.
+
 ## 0.13.0 — 2026-04-19
 
 - Folder tree now auto-collapses siblings on navigation. Going from
