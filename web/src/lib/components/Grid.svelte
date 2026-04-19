@@ -49,13 +49,25 @@
   let containerWidth = 0;
   let containerEl: HTMLDivElement;
 
+  function measure() {
+    if (containerEl) containerWidth = containerEl.clientWidth;
+  }
+
   onMount(() => {
-    const update = () => { if (containerEl) containerWidth = containerEl.clientWidth; };
-    update();
-    const ro = new ResizeObserver(update);
+    measure();
+    // ResizeObserver catches parent-layout changes (sidebar toggles, dialogs);
+    // a window-level resize listener is the safety net for browser width
+    // changes that don't always fan out to the observed node.
+    const ro = new ResizeObserver(measure);
     if (containerEl) ro.observe(containerEl);
     return () => ro.disconnect();
   });
+
+  // Also remeasure on ANY file/thumb-shape change — the container may have
+  // just been mounted (switching from "square" to "original"), in which case
+  // clientWidth is already correct but `containerWidth` still holds the last
+  // value; forcing a read keeps the first paint right.
+  $: if (containerEl && (files || $thumbShape)) measure();
 
   type Sized = { file: any; h: number };
   function buildRows(list: any[], W: number, targetH: number): Sized[][] {
@@ -106,6 +118,8 @@
     ? groups.map(g => ({ ...g, rows: buildRows(g.items, containerWidth, itemSize) }))
     : null;
 </script>
+
+<svelte:window on:resize={measure} />
 
 <div class="timeline" bind:this={containerEl} style="--size: {itemSize}px">
   {#if groups}

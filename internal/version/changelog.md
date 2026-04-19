@@ -2,6 +2,13 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.27.0 — 2026-04-19
+
+- "Oorspronkelijke verhouding" grid now reflows on browser resize. Added
+  a `window.resize` listener as a safety net around the existing
+  `ResizeObserver`, plus a re-measure on file/shape changes so the first
+  paint after switching layouts is always right.
+
 ## 0.26.0 — 2026-04-19
 
 - Toolbar choices (sort, density, thumbnail shape) are now persisted to
