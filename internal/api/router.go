@@ -100,6 +100,10 @@ func NewRouter(d Deps) http.Handler {
 
 			ad := &adminDeps{DB: d.DB}
 			r.Post("/account/password", ad.handleChangePassword)
+
+			md := &metaDeps{DB: d.DB}
+			r.Get("/version", md.handleVersion)
+			r.Get("/latest", md.handleLatest)
 		})
 
 		// Admin-only routes (require login + admin).

@@ -1,6 +1,10 @@
-.PHONY: build test lint fmt run
+.PHONY: build test lint fmt run changelog
 
-build:
+# Keep the embedded changelog copy in sync with the root CHANGELOG.md.
+changelog:
+	cp CHANGELOG.md internal/version/changelog.md
+
+build: changelog
 	go build -o frames ./cmd/frames
 
 test:

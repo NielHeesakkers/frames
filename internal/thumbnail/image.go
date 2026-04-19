@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 )
 
@@ -13,6 +15,11 @@ import (
 // (JPEG, PNG, HEIC, WebP, AVIF, TIFF, and — when libvips is built with
 // libraw — RAW) and produce a WebP of the given longest edge.
 func GenerateImageThumb(ctx context.Context, src, dst string, size int, quality int) error {
+	// Ensure the destination directory exists — cache shard dirs (00..ff) are
+	// created on demand, not up front.
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
 	// vipsthumbnail writes output next to source by default; we pass -o with absolute dest path.
 	// Format args after `[...]` control webp encode quality.
 	outArg := dst + "[Q=" + itoa(quality) + ",strip]"

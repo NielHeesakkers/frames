@@ -89,5 +89,12 @@ export const api = {
   scanStatus: () => req<any>('GET', '/api/admin/scan_status'),
 
   changePassword: (old: string, neo: string) =>
-    req<void>('POST', '/api/account/password', { old, new: neo })
+    req<void>('POST', '/api/account/password', { old, new: neo }),
+
+  version: () => req<{ version: string; changelog: string }>('GET', '/api/version'),
+  latest: (filesLimit = 10, foldersLimit = 10) =>
+    req<{ files: any[]; folders: any[] }>(
+      'GET',
+      `/api/latest?files=${filesLimit}&folders=${foldersLimit}`
+    )
 };

@@ -123,8 +123,13 @@ func (p *Pool) processOne(ctx context.Context, id int64) error {
 	}
 
 	switch f.Kind {
-	case "image", "raw":
+	case "image":
 		err = GenerateImageThumb(ctx, src, dst, ThumbSize, ThumbQuality)
+	case "raw":
+		// libvips on Alpine isn't built with libraw support, so we can't decode
+		// RAW pixels directly. Every modern RAW format embeds a JPEG preview —
+		// we extract that with exiftool and thumbnail the extracted JPEG.
+		err = GenerateRawThumb(ctx, src, dst, ThumbSize, ThumbQuality)
 	case "video":
 		err = GenerateVideoThumb(ctx, src, dst, ThumbSize, ThumbQuality)
 	default:

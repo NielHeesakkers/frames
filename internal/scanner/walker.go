@@ -26,9 +26,19 @@ type fileEntry struct {
 // ignoredPrefixes lists name prefixes we skip entirely (OS dotfiles, thumbnail sidecars).
 var ignoredPrefixes = []string{".DS_Store", ".", "@eaDir", "Thumbs.db"}
 
+// ignoredSuffixes lists file-name suffixes (case-insensitive) we hide from users.
+// XMP sidecars sit next to RAW files and are metadata, not photos.
+var ignoredSuffixes = []string{".xmp", ".thm"}
+
 func isIgnored(name string) bool {
 	for _, p := range ignoredPrefixes {
 		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	lower := strings.ToLower(name)
+	for _, s := range ignoredSuffixes {
+		if strings.HasSuffix(lower, s) {
 			return true
 		}
 	}
