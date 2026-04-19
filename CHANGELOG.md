@@ -2,6 +2,15 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.16.0 — 2026-04-19
+
+- Lightbox layout fix: previous version had 4 grid items in a 3-column
+  grid, so the EXIF panel got auto-placed into a second row, squished to
+  60 px wide, showing just "P." and "13 van 137". Switched to an
+  explicit 4-column grid (nav | media | nav | info), centered image,
+  fully opaque background, and bumped the z-index so the (app) shell
+  doesn't show through.
+
 ## 0.15.0 — 2026-04-19
 
 - Lightbox redesign: close button (✕ top-right, also Esc), ← → actually

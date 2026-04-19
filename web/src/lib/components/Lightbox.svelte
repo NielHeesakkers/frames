@@ -126,27 +126,37 @@
 </div>
 
 <style>
-  .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.96);
-    display: grid; grid-template-columns: 60px 1fr 320px; z-index: 100; }
+  .lightbox { position: fixed; inset: 0; background: #000;
+    display: grid;
+    grid-template-columns: 60px 1fr 60px 340px;
+    grid-template-rows: 1fr;
+    z-index: 1000; }
 
-  .close { position: absolute; top: 12px; right: 12px; z-index: 110;
+  .close { position: absolute; top: 12px; right: 360px; z-index: 110;
     width: 36px; height: 36px; border-radius: 50%;
     background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
     color: #fff; font-size: 16px; cursor: pointer;
     display: grid; place-items: center; }
   .close:hover { background: rgba(255,255,255,0.16); }
 
-  .media { display: grid; place-items: center; padding: 20px; grid-column: 2; }
-  .media img, .media video { max-width: 100%; max-height: 100%; object-fit: contain; }
-  .download-fallback { color: var(--accent); font-size: 18px; }
-
   .nav { background: transparent; color: #fff; border: none; font-size: 48px;
-    cursor: pointer; }
+    cursor: pointer; grid-row: 1; display: grid; place-items: center;
+    min-width: 0; min-height: 0; }
+  .nav.left { grid-column: 1; }
+  .nav.right { grid-column: 3; }
   .nav:disabled { opacity: 0.25; cursor: default; }
   .nav:not(:disabled):hover { color: var(--accent); }
 
-  .info { background: var(--bg-2); padding: 20px 22px; overflow-y: auto;
-    border-left: 1px solid var(--border); }
+  .media { grid-column: 2; grid-row: 1;
+    display: grid; place-items: center; padding: 20px;
+    min-width: 0; min-height: 0; overflow: hidden; }
+  .media img, .media video { max-width: 100%; max-height: 100%; object-fit: contain;
+    display: block; }
+  .download-fallback { color: var(--accent); font-size: 18px; }
+
+  .info { grid-column: 4; grid-row: 1;
+    background: var(--bg-2); padding: 52px 22px 22px; overflow-y: auto;
+    border-left: 1px solid var(--border); min-width: 0; }
   .info h3 { margin: 0 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .position { color: var(--fg-dim); font-size: 12px; margin: 0 0 14px; }
 
@@ -161,9 +171,14 @@
     padding: 8px 14px; border-radius: var(--radius); text-decoration: none; font-size: 13px; }
   .dl:hover { opacity: 0.9; }
 
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
     .lightbox { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
-    .nav { display: none; }
-    .info { border-left: none; border-top: 1px solid var(--border); max-height: 40vh; }
+    .close { top: 12px; right: 12px; }
+    .nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 110; }
+    .nav.left { left: 4px; grid-column: unset; }
+    .nav.right { right: 4px; grid-column: unset; }
+    .media { grid-column: 1; }
+    .info { grid-column: 1; grid-row: 2; padding: 16px 16px 22px;
+      border-left: none; border-top: 1px solid var(--border); max-height: 40vh; }
   }
 </style>
