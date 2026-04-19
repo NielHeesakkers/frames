@@ -8,8 +8,18 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REMOTE_HOST="server@servermini.local"
 REMOTE_DIR="/Users/server/Docker/frames-src"
+REMOTE_FRONTEND="/Users/server/Docker/Frames/Frontend"
 
 cd "$REPO_ROOT"
+
+# The container's FRAMES_FRONTEND_DIR overrides the embedded frontend, so
+# any UI changes must also land in the bind-mount dir. Build + sync first
+# so that by the time the container restarts, both backend and frontend
+# are in sync.
+echo "=== build + sync frontend ==="
+( cd web && npm run build 2>&1 | tail -2 )
+rsync -a --delete web/build/ "$REMOTE_HOST:$REMOTE_FRONTEND/"
+
 echo "=== rsync source ==="
 rsync -a --delete \
   --exclude='.git' --exclude='.superpowers' \
