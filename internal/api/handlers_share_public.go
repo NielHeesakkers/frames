@@ -77,6 +77,10 @@ type unlockReq struct {
 
 func (psh *publicShareDeps) handleUnlock(w http.ResponseWriter, r *http.Request) {
 	tok := chi.URLParam(r, "token")
+	if !psh.Limiter.Allow("unlock:" + tok) {
+		WriteError(w, http.StatusTooManyRequests, "too many attempts")
+		return
+	}
 	s, err := psh.DB.ShareByToken(tok)
 	if err != nil || share.Validate(s) != share.StatusActive {
 		WriteError(w, http.StatusNotFound, "invalid share")
