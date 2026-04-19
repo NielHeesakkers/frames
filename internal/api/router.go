@@ -4,6 +4,7 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -137,7 +138,13 @@ func NewRouter(d Deps) http.Handler {
 		r.Post("/{token}/upload", psh.handleAnonymousUpload)
 	})
 
-	r.NotFound(frontend.Handler().ServeHTTP)
+	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			WriteError(w, http.StatusNotFound, "not found")
+			return
+		}
+		frontend.Handler().ServeHTTP(w, r)
+	})
 
 	return r
 }
