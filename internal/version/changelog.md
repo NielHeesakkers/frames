@@ -2,6 +2,13 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.12.0 — 2026-04-19
+
+- Folder tree remembers which folders you expanded. Expansion state is
+  persisted to `localStorage` and restored on page load, so a refresh
+  never collapses branches you had open. Tree rows also navigate via a
+  proper `<a href>` now (the chevron still toggles expansion only).
+
 ## 0.11.0 — 2026-04-19
 
 - Folder tree in the sidebar auto-expands to the current path on page

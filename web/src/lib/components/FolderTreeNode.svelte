@@ -1,8 +1,7 @@
 <!-- web/src/lib/components/FolderTreeNode.svelte -->
 <script lang="ts">
-  import { goto } from '$app/navigation';
   import { api } from '$lib/api';
-  import { currentFolderPath } from '$lib/stores';
+  import { currentFolderPath, setExpanded } from '$lib/stores';
   import Self from './FolderTreeNode.svelte';
 
   type Node = {
@@ -33,40 +32,37 @@
     }
   }
 
-  // Single-click: navigate AND expand (if collapsible).
-  async function onRowClick() {
-    currentFolderPath.set(node.path);
-    goto('/browse/' + node.path.split('/').map(encodeURIComponent).join('/'));
-    if (node.has_child) {
-      if (!node.expanded) {
-        node.expanded = true;
-        await loadChildren();
-      }
-      onUpdate();
-    }
+  // Single-click: navigate only. Expansion follows the auto-expand logic
+  // in FolderTree (and the chevron toggle below).
+  function onRowClick() {
+    // href-based navigation is provided by the <a> element; no JS needed here.
   }
 
-  // Clicking the arrow alone only toggles (without navigating).
+  // Clicking the arrow toggles expansion and persists it to the store so the
+  // tree keeps its shape across page refreshes.
   async function onToggle(e: MouseEvent) {
     e.stopPropagation();
-    node.expanded = !node.expanded;
-    if (node.expanded) await loadChildren();
+    e.preventDefault();
+    const nowExpanded = !node.expanded;
+    node.expanded = nowExpanded;
+    setExpanded(node.path, nowExpanded);
+    if (nowExpanded) await loadChildren();
     onUpdate();
   }
 </script>
 
 <li>
-  <div class="row" class:active={$currentFolderPath === node.path}
-       style="padding-left: {10 + depth * 14}px"
-       on:click={onRowClick}>
+  <a class="row" class:active={$currentFolderPath === node.path}
+     style="padding-left: {10 + depth * 14}px"
+     href={'/browse/' + node.path.split('/').map(encodeURIComponent).join('/')}>
     {#if node.has_child}
-      <button class="toggle" on:click={onToggle}>{node.expanded ? '▾' : '▸'}</button>
+      <button type="button" class="toggle" on:click={onToggle}>{node.expanded ? '▾' : '▸'}</button>
     {:else}
       <span class="toggle" />
     {/if}
     <span class="name">{node.name || 'Photos'}</span>
     <span class="count">{node.items}</span>
-  </div>
+  </a>
 
   {#if node.expanded && node.children}
     <ul class="sub">
@@ -85,7 +81,8 @@
   li { list-style: none; }
   .sub { list-style: none; padding: 0; margin: 0; }
   .row { display: grid; grid-template-columns: 20px 1fr auto; align-items: center;
-    gap: 4px; padding: 4px 10px; cursor: pointer; border-radius: 3px; }
+    gap: 4px; padding: 4px 10px; cursor: pointer; border-radius: 3px;
+    text-decoration: none; color: inherit; }
   .row:hover { background: rgba(255,255,255,0.05); }
   .row.active { background: rgba(74,124,255,0.15); color: var(--accent); }
   .toggle { width: 20px; height: 20px; background: transparent; border: none;
