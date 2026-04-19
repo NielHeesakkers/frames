@@ -101,9 +101,10 @@
      aspect ratio. Rows wrap and distribute leftover space proportionally,
      so they always fill container width exactly. */
   .jgrid { display: flex; flex-wrap: wrap; gap: 4px; padding-bottom: 10px; }
-  .jslot { height: auto; min-height: 60px; position: relative; }
-  /* Force the nested GridItem to fill the slot. */
-  .jslot :global(> .item) { width: 100% !important; height: 100% !important; }
+  .jslot { min-height: 60px; position: relative; }
+  /* Force the nested GridItem's root div (.item) to fill the slot exactly,
+     overriding its own inline width/height. Svelte needs `>` outside :global. */
+  .jslot > :global(.item) { width: 100% !important; height: 100% !important; }
   /* Absorbs slack so a half-full last row doesn't stretch items to 2×+ width. */
   .jfiller { flex: 99 1 0; height: 0; pointer-events: none; }
   .month { position: sticky; top: 0; z-index: 2;

@@ -2,6 +2,15 @@
 
 All notable changes land here, newest on top. Version bumps follow a simple 0.1 increment per shipped change.
 
+## 0.34.0 — 2026-04-19
+
+- Fix "Oorspronkelijke verhouding" rendering everything as squares. The
+  CSS rule that forces GridItem to fill its justified-row slot used
+  `:global(> .item)` (invalid Svelte syntax) — the `>` belongs outside
+  `:global(...)`. Now each slot stretches GridItem to 100%×100%,
+  overriding its own inline dimensions so the aspect-ratio laid-out
+  tiles actually show at their true shape.
+
 ## 0.33.0 — 2026-04-19
 
 - Video thumbnail is now the middle frame instead of a fixed "3 seconds
